@@ -14,8 +14,10 @@ import pandas as pd
 import seaborn as sns
 
 ### Setting flags and parameters
-highpass_filt = 20
-lowpass_filt = 500
+emg_highpass_filt = 20
+emg_lowpass_filt = 500
+eeg_highpass_filt = 0.1
+eeg_lowpass_filt = 70
 notch_freqs = (60, 120, 180, 240, 300, 360)
 artefact_escape_ms = 10 / 1000
 valor_ms = 60
@@ -26,10 +28,12 @@ bool_export = False
 bool_print = False
 
 # Construct the relative path to the EDF file
-file_path = os.path.join(os.getcwd(), 'data_PD_Neuromat', 'thais_tree.edf')
+file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/TEPs_2025.07.08.bdf'
+
+# file_path = os.path.join(os.getcwd(), 'data_PD_Neuromat', 'thais_tree.edf')
 
 # Read the EDF file
-raw = mne.io.read_raw_edf(file_path, preload=True)
+raw = mne.io.read_raw_bdf(file_path, preload=True)
 
 # Access the data as a NumPy array
 data = raw.get_data()
@@ -46,7 +50,7 @@ if bool_plot:
 filt_data = raw.notch_filter(freqs=notch_freqs, trans_bandwidth=2, notch_widths=2, picks=[0])
 
 # Apply a high-pass filter at 20-500 Hz  using an IIR Butterworth filter                       -> IIR x FIR?
-filt_data = filt_data.copy().filter(l_freq=highpass_filt, h_freq=lowpass_filt, picks=['Input 33'], method="iir", n_jobs=2, iir_params=dict(order=8, ftype="butter"))
+filt_data = filt_data.copy().filter(l_freq=emg_highpass_filt, h_freq=emg_lowpass_filt, picks=['Input 33'], method="iir", n_jobs=2, iir_params=dict(order=8, ftype="butter"))
 
 # Plot filtered data
 if bool_plot:

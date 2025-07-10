@@ -16,8 +16,8 @@ import seaborn as sns
 ### Setting flags and parameters
 emg_highpass_filt = 10
 emg_lowpass_filt = 450
-eeg_highpass_filt = 0.1
-eeg_lowpass_filt = 70
+eeg_highpass_filt = 1
+eeg_lowpass_filt = 250
 eog_highpass_filt = 0.1
 eog_lowpass_filt = 30
 notch_freqs = (60, 120, 180, 240, 300, 360)
@@ -25,7 +25,7 @@ artefact_escape_ms = 10 / 1000
 valor_ms = 60
 valor_x = valor_ms / 1000
 fs=5000
-bool_plot = True
+bool_plot = False
 bool_export = False
 bool_print = False
 
@@ -37,8 +37,8 @@ file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/TEPs
 # Read the EDF file
 raw = mne.io.read_raw_bdf(file_path, preload=True)
 
-# Access the data as a NumPy array
-data = raw.get_data()
+# # Access the data as a NumPy array
+# data = raw.get_data()
 
 # Get metadata and channel names
 print(raw.info)
@@ -51,17 +51,80 @@ if bool_plot:
     raw.plot(picks=['EOG'], scalings='auto', title='Raw EOG Data', show=True)
 
 # Apply the notch filter in EEG data
-filt_data = raw.notch_filter(freqs=notch_freqs, trans_bandwidth=2, notch_widths=2, picks=all(raw.ch_names))
+filt_data = raw.notch_filter(freqs=60, picks=raw.ch_names)
 
-# Apply a high-pass filter at 20-500 Hz  using an IIR Butterworth filter                       -> IIR x FIR?
-filt_data = filt_data.copy().filter(l_freq=emg_highpass_filt, h_freq=emg_lowpass_filt, picks=['EMG'], method="iir", n_jobs=2, iir_params=dict(order=8, ftype="butter"))
-
-
-filt_data = raw.notch_filter(freqs=notch_freqs, trans_bandwidth=2, notch_widths=2, picks=[
+# Apply bandpass filters to EEG, EOG, and EMG data
+filt_eeg_data = filt_data.copy().filter(l_freq=eeg_highpass_filt, h_freq=eeg_lowpass_filt, picks=[
     'Fp1', 'Fp2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'F7', 'F8', 'T7', 'T8',
     'P7', 'P8', 'Pz', 'Iz', 'FC1', 'FC2', 'CP1', 'CP2', 'FC5', 'FC6', 'CP5', 'CP6', 'TP9',
     'TP10', 'AFz', 'FCz'
-])
+], fir_design='firwin')
+
+filt_eog_data = filt_data.copy().filter(l_freq=eog_highpass_filt, h_freq=eog_lowpass_filt,
+    picks=['EOG'], method="iir", n_jobs=2, iir_params=dict(order=8, ftype="butter"))
+
+filt_emg_data = filt_data.copy().filter(l_freq=emg_highpass_filt, h_freq=emg_lowpass_filt, 
+    picks=['EMG'], method="iir", n_jobs=2, iir_params=dict(order=8, ftype="butter"))
+
+# Get events from annotations and create epochs
+events_from_annot, event_dict = mne.events_from_annotations(raw)
+
+epochs = mne.Epochs(raw, events_from_annot, event_dict, tmin=-0.2, tmax=0.5, preload=True)
+
+# Plot epochs
+epochs.plot()
+
+# Average epochs to get a single epoch
+evoked = epochs.average()
+evoked.plot()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Plot filtered data
+filt_eeg_data.plot(picks=['Fp1', 'Fp2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'F7', 'F8', 'T7', 'T8',
+                          'P7', 'P8', 'Pz', 'Iz', 'FC1', 'FC2', 'CP1', 'CP2', 'FC5', 'FC6', 'CP5', 'CP6', 'TP9',
+                          'TP10', 'AFz', 'FCz'], scalings='auto', title='Filtered EEG Data', show=True)
+
+filt_emg_data.plot(picks=['EMG'], scalings='auto', title='Filtered EMG Data', show=True)
+
+filt_eog_data.plot(picks=['EOG'], scalings='auto', title='Filtered EOG Data', show=True)
+
+# Apply ICA to EEG data
+ica = mne.preprocessing.ICA(n_components=20, random_state=97, max_iter=800)
+ica.fit(filt_eeg_data)
+filt_eeg_data = ica.apply(filt_eeg_data)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

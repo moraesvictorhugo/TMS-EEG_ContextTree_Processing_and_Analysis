@@ -14,16 +14,18 @@ import pandas as pd
 import seaborn as sns
 
 ### Setting flags and parameters
-emg_highpass_filt = 20
-emg_lowpass_filt = 500
+emg_highpass_filt = 10
+emg_lowpass_filt = 450
 eeg_highpass_filt = 0.1
 eeg_lowpass_filt = 70
+eog_highpass_filt = 0.1
+eog_lowpass_filt = 30
 notch_freqs = (60, 120, 180, 240, 300, 360)
 artefact_escape_ms = 10 / 1000
 valor_ms = 60
 valor_x = valor_ms / 1000
 fs=5000
-bool_plot = False
+bool_plot = True
 bool_export = False
 bool_print = False
 
@@ -44,13 +46,28 @@ print(raw.ch_names)
 
 # Plot the first channel only
 if bool_plot:
-    raw.plot()
+    raw.plot(picks=['EMG'], scalings='auto', title='Raw EMG Data', show=True)
+    raw.plot(picks=['C3'], scalings='auto', title='Raw C3 EEG Data', show=True)
+    raw.plot(picks=['EOG'], scalings='auto', title='Raw EOG Data', show=True)
 
-# Apply the notch filter
-filt_data = raw.notch_filter(freqs=notch_freqs, trans_bandwidth=2, notch_widths=2, picks=[0])
+# Apply the notch filter in EEG data
+filt_data = raw.notch_filter(freqs=notch_freqs, trans_bandwidth=2, notch_widths=2, picks=all(raw.ch_names))
 
 # Apply a high-pass filter at 20-500 Hz  using an IIR Butterworth filter                       -> IIR x FIR?
-filt_data = filt_data.copy().filter(l_freq=emg_highpass_filt, h_freq=emg_lowpass_filt, picks=['Input 33'], method="iir", n_jobs=2, iir_params=dict(order=8, ftype="butter"))
+filt_data = filt_data.copy().filter(l_freq=emg_highpass_filt, h_freq=emg_lowpass_filt, picks=['EMG'], method="iir", n_jobs=2, iir_params=dict(order=8, ftype="butter"))
+
+
+filt_data = raw.notch_filter(freqs=notch_freqs, trans_bandwidth=2, notch_widths=2, picks=[
+    'Fp1', 'Fp2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'F7', 'F8', 'T7', 'T8',
+    'P7', 'P8', 'Pz', 'Iz', 'FC1', 'FC2', 'CP1', 'CP2', 'FC5', 'FC6', 'CP5', 'CP6', 'TP9',
+    'TP10', 'AFz', 'FCz'
+])
+
+
+
+
+
+
 
 # Plot filtered data
 if bool_plot:

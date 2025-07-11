@@ -17,14 +17,14 @@ import seaborn as sns
 emg_highpass_filt = 10
 emg_lowpass_filt = 450
 eeg_highpass_filt = 1
-eeg_lowpass_filt = 250
+eeg_lowpass_filt = 70
 eog_highpass_filt = 0.1
 eog_lowpass_filt = 30
-notch_freqs = (60, 120, 180, 240, 300, 360)
-artefact_escape_ms = 10 / 1000
-valor_ms = 60
-valor_x = valor_ms / 1000
-fs=5000
+# notch_freqs = (60, 120, 180, 240, 300, 360)
+# artefact_escape_ms = 10 / 1000
+# valor_ms = 60
+# valor_x = valor_ms / 1000
+# fs=5000
 bool_plot = False
 bool_export = False
 bool_print = False
@@ -44,11 +44,22 @@ raw = mne.io.read_raw_bdf(file_path, preload=True)
 print(raw.info)
 print(raw.ch_names)
 
-# Plot the first channel only
-if bool_plot:
-    raw.plot(picks=['EMG'], scalings='auto', title='Raw EMG Data', show=True)
-    raw.plot(picks=['C3'], scalings='auto', title='Raw C3 EEG Data', show=True)
-    raw.plot(picks=['EOG'], scalings='auto', title='Raw EOG Data', show=True)
+# Adjust channel types
+raw.set_channel_types({'EMG': 'emg', 'EOG': 'eog'})  # Adjust names as per your data
+
+# Load the standard montage
+montage = mne.channels.make_standard_montage('standard_1020')
+
+# Drop unused channels
+raw.pick_channels(raw.ch_names[:32])
+
+# Apply the montage
+raw.set_montage(montage)
+
+
+
+
+
 
 # Apply the notch filter in EEG data
 filt_data = raw.notch_filter(freqs=60, picks=raw.ch_names)
@@ -66,17 +77,53 @@ filt_eog_data = filt_data.copy().filter(l_freq=eog_highpass_filt, h_freq=eog_low
 filt_emg_data = filt_data.copy().filter(l_freq=emg_highpass_filt, h_freq=emg_lowpass_filt, 
     picks=['EMG'], method="iir", n_jobs=2, iir_params=dict(order=8, ftype="butter"))
 
+
+# Plot filtered data
+if bool_plot:
+    filt_eeg_data.plot(picks=['Fp1', 'Fp2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'F7', 'F8', 'T7', 'T8',
+                            'P7', 'P8', 'Pz', 'Iz', 'FC1', 'FC2', 'CP1', 'CP2', 'FC5', 'FC6', 'CP5', 'CP6', 'TP9',
+                            'TP10', 'AFz', 'FCz'], scalings='auto', title='Filtered EEG Data', show=True)
+
+    filt_emg_data.plot(picks=['EMG'], scalings='auto', title='Filtered EMG Data', show=True)
+
+    filt_eog_data.plot(picks=['EOG'], scalings='auto', title='Filtered EOG Data', show=True)
+
+
+
+
+
+
+
+
 # Get events from annotations and create epochs
 events_from_annot, event_dict = mne.events_from_annotations(raw)
 
-epochs = mne.Epochs(raw, events_from_annot, event_dict, tmin=-0.2, tmax=0.5, preload=True)
+epochs = mne.Epochs(raw, events_from_annot, event_dict, tmin=-0.1, tmax=0.5, preload=True)
 
 # Plot epochs
 epochs.plot()
 
-# Average epochs to get a single epoch
-evoked = epochs.average()
-evoked.plot()
+
+
+
+# 
+ica = mne.preprocessing.ICA(n_components=20, random_state=97)
+ica.fit(epochs)
+
+# Find components correlated with EOG channels
+eog_indices, eog_scores = ica.find_bads_eog(epochs, ch_name='EOG')
+ica.exclude = eog_indices
+
+# Apply ICA to remove artifacts
+epochs_clean = ica.apply(epochs.copy())
+
+
+
+# Average epochs
+evoked = epochs_clean.average()
+
+# Plot 
+evoked.plot(spatial_colors=True, time_unit='s')
 
 
 
@@ -97,19 +144,6 @@ evoked.plot()
 
 
 
-# Plot filtered data
-filt_eeg_data.plot(picks=['Fp1', 'Fp2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'F7', 'F8', 'T7', 'T8',
-                          'P7', 'P8', 'Pz', 'Iz', 'FC1', 'FC2', 'CP1', 'CP2', 'FC5', 'FC6', 'CP5', 'CP6', 'TP9',
-                          'TP10', 'AFz', 'FCz'], scalings='auto', title='Filtered EEG Data', show=True)
-
-filt_emg_data.plot(picks=['EMG'], scalings='auto', title='Filtered EMG Data', show=True)
-
-filt_eog_data.plot(picks=['EOG'], scalings='auto', title='Filtered EOG Data', show=True)
-
-# Apply ICA to EEG data
-ica = mne.preprocessing.ICA(n_components=20, random_state=97, max_iter=800)
-ica.fit(filt_eeg_data)
-filt_eeg_data = ica.apply(filt_eeg_data)
 
 
 
@@ -127,10 +161,7 @@ filt_eeg_data = ica.apply(filt_eeg_data)
 
 
 
-
-
-
-
+# SCRIPT USADO PARA ANALISAR MEPs DA ÀRVORE - PRECISA SER AJUSTADO
 
 # Plot filtered data
 if bool_plot:

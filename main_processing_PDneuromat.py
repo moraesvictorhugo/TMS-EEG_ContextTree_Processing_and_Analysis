@@ -114,7 +114,7 @@ evoked.plot(spatial_colors=True, time_unit='s', titles='Average Evoked Response 
 # Optional: plot topographic maps at selected latencies
 evoked.plot_topomap(times=[0.01, 0.03, 0.05, 0.07], ch_type='eeg', time_unit='s')
 
-# # Plot evoked potentials for selected EEG channels
+### Plot evoked potentials for selected EEG channels
 eeg_channels = [ch for ch in evoked.ch_names if evoked.get_channel_types(picks=ch)[0] == 'eeg']
 n_channels = len(eeg_channels)
 
@@ -142,7 +142,7 @@ for win_idx, ch_group in enumerate(channel_groups, start=1):
         # Extract data in the time window and convert to µV
         data = evoked.data[ch_idx, time_mask] * 1e6
         axes[i].plot(times, data)
-        axes[i].set_ylim(ymin, ymax)  # <-- Set fixed y-axis limits here
+        axes[i].set_ylim(ymin, ymax)
         axes[i].set_title(ch)
         axes[i].axvline(0, color='r', linestyle='--')  # stimulus onset
         axes[i].set_xlabel('Time (s)')

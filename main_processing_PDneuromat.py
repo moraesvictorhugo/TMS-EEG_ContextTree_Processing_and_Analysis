@@ -13,6 +13,7 @@ import os
 import pandas as pd
 import seaborn as sns
 
+
 ### Setting flags and parameters
 emg_highpass_filt = 10
 emg_lowpass_filt = 450
@@ -56,16 +57,13 @@ raw.pick_channels(raw.ch_names[:32])
 # Apply the montage
 raw.set_montage(montage)
 
-
-
-
-
+# Working -----------------------------------------------------------------------------------
 
 # Apply the notch filter in EEG data
 filt_data = raw.notch_filter(freqs=60, picks=raw.ch_names)
 
 # Apply bandpass filters to EEG, EOG, and EMG data
-filt_eeg_data = filt_data.copy().filter(l_freq=eeg_highpass_filt, h_freq=eeg_lowpass_filt, picks=[
+filt_eeg_data = filt_data.copy().filter(l_freq=eeg_highpass_filt, h_freq=None, picks=[
     'Fp1', 'Fp2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'F7', 'F8', 'T7', 'T8',
     'P7', 'P8', 'Pz', 'Iz', 'FC1', 'FC2', 'CP1', 'CP2', 'FC5', 'FC6', 'CP5', 'CP6', 'TP9',
     'TP10', 'AFz', 'FCz'
@@ -77,7 +75,6 @@ filt_eog_data = filt_data.copy().filter(l_freq=eog_highpass_filt, h_freq=eog_low
 filt_emg_data = filt_data.copy().filter(l_freq=emg_highpass_filt, h_freq=emg_lowpass_filt, 
     picks=['EMG'], method="iir", n_jobs=2, iir_params=dict(order=8, ftype="butter"))
 
-
 # Plot filtered data
 if bool_plot:
     filt_eeg_data.plot(picks=['Fp1', 'Fp2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'F7', 'F8', 'T7', 'T8',
@@ -88,25 +85,15 @@ if bool_plot:
 
     filt_eog_data.plot(picks=['EOG'], scalings='auto', title='Filtered EOG Data', show=True)
 
-
-
-
-
-
-
-
 # Get events from annotations and create epochs
 events_from_annot, event_dict = mne.events_from_annotations(raw)
 
-epochs = mne.Epochs(raw, events_from_annot, event_dict, tmin=-0.1, tmax=0.5, preload=True)
+epochs = mne.Epochs(filt_eeg_data, events_from_annot, event_dict, tmin=-0.1, tmax=0.5, preload=True)
 
 # Plot epochs
 epochs.plot()
 
-
-
-
-# 
+# ICA to remove artifacts
 ica = mne.preprocessing.ICA(n_components=20, random_state=97)
 ica.fit(epochs)
 
@@ -114,16 +101,63 @@ ica.fit(epochs)
 eog_indices, eog_scores = ica.find_bads_eog(epochs, ch_name='EOG')
 ica.exclude = eog_indices
 
-# Apply ICA to remove artifacts
+# Apply ICA to remove artifacts and plot components
 epochs_clean = ica.apply(epochs.copy())
+ica.plot_components(inst=epochs_clean, show=True)
 
-
-
-# Average epochs
+# Compute average evoked response
 evoked = epochs_clean.average()
 
-# Plot 
-evoked.plot(spatial_colors=True, time_unit='s')
+# Plot evoked potentials for all EEG channels
+evoked.plot(spatial_colors=True, time_unit='s', titles='Average Evoked Response (TEPs)')
+
+# Optional: plot topographic maps at selected latencies
+evoked.plot_topomap(times=[0.01, 0.03, 0.05, 0.07], ch_type='eeg', time_unit='s')
+
+# # Plot evoked potentials for selected EEG channels
+eeg_channels = [ch for ch in evoked.ch_names if evoked.get_channel_types(picks=ch)[0] == 'eeg']
+n_channels = len(eeg_channels)
+
+# Define time window in seconds and set y-axis limits
+tmin, tmax = -0.1, 0.5
+ymin, ymax = -40, 40
+
+# Find indices corresponding to this time window
+time_mask = (evoked.times >= tmin) & (evoked.times <= tmax)
+times = evoked.times[time_mask]
+
+# Split channels roughly in half for two windows
+split_idx = n_channels // 2
+channel_groups = [eeg_channels[:split_idx], eeg_channels[split_idx:]]
+
+for win_idx, ch_group in enumerate(channel_groups, start=1):
+    n_ch = len(ch_group)
+    ncols = 4
+    nrows = int(np.ceil(n_ch / ncols))
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, nrows * 2))
+    axes = axes.flatten()
+
+    for i, ch in enumerate(ch_group):
+        ch_idx = evoked.ch_names.index(ch)
+        # Extract data in the time window and convert to µV
+        data = evoked.data[ch_idx, time_mask] * 1e6
+        axes[i].plot(times, data)
+        axes[i].set_ylim(ymin, ymax)  # <-- Set fixed y-axis limits here
+        axes[i].set_title(ch)
+        axes[i].axvline(0, color='r', linestyle='--')  # stimulus onset
+        axes[i].set_xlabel('Time (s)')
+        axes[i].set_ylabel('Amplitude (µV)')
+        axes[i].grid(True)
+
+    # Hide unused subplots
+    for j in range(i + 1, len(axes)):
+        axes[j].axis('off')
+
+    plt.suptitle(f'Average Evoked EEG Signals - Window {win_idx}')
+    plt.tight_layout(rect=[0, 0, 1, 0.96])  # leave space for suptitle
+    plt.show()
+
+
 
 
 

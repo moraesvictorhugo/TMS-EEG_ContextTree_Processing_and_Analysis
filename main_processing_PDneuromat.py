@@ -12,7 +12,8 @@ from scipy import signal
 import os
 import pandas as pd
 import seaborn as sns
-
+from mne.preprocessing import ICA
+from mne_icalabel import label_components
 
 ### Setting flags and parameters
 emg_highpass_filt = 10
@@ -57,8 +58,6 @@ raw.pick_channels(raw.ch_names[:32])
 # Apply the montage
 raw.set_montage(montage)
 
-# Working -----------------------------------------------------------------------------------
-
 # Apply the notch filter in EEG data
 filt_data = raw.notch_filter(freqs=60, picks=raw.ch_names)
 
@@ -91,11 +90,14 @@ events_from_annot, event_dict = mne.events_from_annotations(raw)
 epochs = mne.Epochs(filt_eeg_data, events_from_annot, event_dict, tmin=-0.1, tmax=0.5, preload=True)
 
 # Plot epochs
-epochs.plot()
+# epochs.plot()
 
 # ICA to remove artifacts
 ica = mne.preprocessing.ICA(n_components=20, random_state=97)
 ica.fit(epochs)
+
+# Label components using ICLabel
+labels = label_components(epochs, ica, method='iclabel')
 
 # Find components correlated with EOG channels
 eog_indices, eog_scores = ica.find_bads_eog(epochs, ch_name='EOG')
@@ -103,16 +105,22 @@ ica.exclude = eog_indices
 
 # Apply ICA to remove artifacts and plot components
 epochs_clean = ica.apply(epochs.copy())
-ica.plot_components(inst=epochs_clean, show=True)
+# ica.plot_components(inst=epochs_clean, show=True)
+
+# Baseline correction
+epochs_clean = epochs_clean.apply_baseline(baseline=(None, 0))
+
+# Apply low pass filter
+epochs_clean = epochs_clean.copy().filter(l_freq=None, h_freq=80)
 
 # Compute average evoked response
 evoked = epochs_clean.average()
 
 # Plot evoked potentials for all EEG channels
-evoked.plot(spatial_colors=True, time_unit='s', titles='Average Evoked Response (TEPs)')
+# evoked.plot(spatial_colors=True, time_unit='s', titles='Average Evoked Response (TEPs)')
 
 # Optional: plot topographic maps at selected latencies
-evoked.plot_topomap(times=[0.01, 0.03, 0.05, 0.07], ch_type='eeg', time_unit='s')
+# evoked.plot_topomap(times=[0.01, 0.03, 0.05, 0.07], ch_type='eeg', time_unit='s')
 
 ### Plot evoked potentials for selected EEG channels
 eeg_channels = [ch for ch in evoked.ch_names if evoked.get_channel_types(picks=ch)[0] == 'eeg']
@@ -148,6 +156,8 @@ for win_idx, ch_group in enumerate(channel_groups, start=1):
         axes[i].set_xlabel('Time (s)')
         axes[i].set_ylabel('Amplitude (µV)')
         axes[i].grid(True)
+        # Highlight region between 0.015 and 0.060 seconds
+        axes[i].axvspan(0.015, 0.060, color='yellow', alpha=0.3)
 
     # Hide unused subplots
     for j in range(i + 1, len(axes)):

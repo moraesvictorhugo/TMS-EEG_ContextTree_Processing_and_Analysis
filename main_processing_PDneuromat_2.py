@@ -1,7 +1,9 @@
 '''
-Main script for data processing
+Pipeline Analysis based on: 
 
+https://pypi.org/project/tmseegpy/0.2.1/
 '''
+
 import mne
 import numpy as np
 import matplotlib.pyplot as plt
@@ -34,7 +36,27 @@ bool_print = False
 # Construct the relative path to the EDF file
 file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/TEPs_2025.07.08.bdf'
 
-# file_path = os.path.join(os.getcwd(), 'data_PD_Neuromat', 'thais_tree.edf')
+'''
+Order of steps
+
+    Load data
+    Find/create events
+    Drop unused channels (e.g., EMG)
+    Remove TMS artifact using baseline data (window: -5 - 2ms)
+    Filter raw EEG data (high-pass 1 Hz, low-pass: 250 Hz and notch filter 50 Hz)
+    Create epochs (-0.8 to 0.8)
+    Average reference
+    Remove bad channels (manual or threshold=3)
+    Remove bad epochs (manual or threshold=3)
+    First ICA (FastICA)
+    (Optional and very experimental) PARAFAC decomposition
+    (Optional) Second ICA (Infomax)
+    (Optional) SSP
+    Filter epoched data (low-pass 45 Hz)
+    Downsampling (725 Hz)
+    TEP plotting
+    PCIst
+'''
 
 # Read the EDF file
 raw = mne.io.read_raw_bdf(file_path, preload=True)

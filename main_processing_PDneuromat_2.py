@@ -218,7 +218,7 @@ pf.plot_evoked_eeg_by_channel_groups(
 ##### Just exploring ........
 '''
 
-# Plot 10 teps for selected EEG channels
+# Plot 10 processed teps for selected EEG channels
 
 # Select the first 10 epochs only
 epochs_first10 = epochs_clean[:10]

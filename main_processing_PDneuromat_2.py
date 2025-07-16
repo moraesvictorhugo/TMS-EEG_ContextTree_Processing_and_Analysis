@@ -118,14 +118,14 @@ epochs.set_eeg_reference('average')
 ##### Plot TEPs before ICA (Temporary)
 '''
 # Plot raw TEPs
-epochs = epochs.average()
+epochs_beforeICA = epochs.average()
 pf.plot_evoked_eeg_by_channel_groups(
-    epochs,
+    epochs_beforeICA,
     tmin=-0.1, tmax=0.35,
     ymin=-20, ymax=20,
     ncols=4,
     window_highlights=[(0.010, 0.035, 'orange', 0.3), (0.090, 0.190, 'yellow', 0.3)],
-    split_groups=2
+    split_groups=4
 )
 
 '''
@@ -137,7 +137,7 @@ pf.plot_evoked_eeg_by_channel_groups(
 ##### Remove bad epochs
 '''
 # Remove bad epochs
-epochs.drop_bad() # verificar parametros
+# epochs.drop_bad() # verificar parametros
 
 '''
 ##### First ICA
@@ -147,7 +147,7 @@ ica = mne.preprocessing.ICA(n_components=20, random_state=97)
 ica.fit(epochs)
 
 # Plot ICA components
-ica.plot_sources(epochs, show_scrollbars=False, block=True)
+# ica.plot_sources(epochs, show_scrollbars=False, block=True)
 
 # Get fraction of variance explained by all components
 explained_var_ratio = ica.get_explained_variance_ratio(epochs)
@@ -159,7 +159,7 @@ ica.exclude = [0, 1, 10, 13]
 epochs_clean = ica.apply(epochs.copy())
 
 # Plot cleaned epochs
-epochs_clean.plot(block = True)
+# epochs_clean.plot(block = True)
 
 '''
 ##### (Optional and very experimental) PARAFAC decomposition
@@ -173,14 +173,14 @@ ica = mne.preprocessing.ICA(method='infomax', n_components=20, random_state=97)
 ica.fit(epochs_clean)
 
 # Plot ICA components
-ica.plot_sources(epochs_clean, show_scrollbars=False, block=True)
+# ica.plot_sources(epochs_clean, show_scrollbars=False, block=True)
 
 # Remove bad components
 ica.exclude = [3, 6, 7, 10, 19]
 epochs_clean = ica.apply(epochs_clean.copy())
 
 # Plot cleaned epochs
-epochs_clean.plot(block = True)
+# epochs_clean.plot(block = True)
 
 '''
 ##### (Optional) SSP
@@ -211,21 +211,32 @@ pf.plot_evoked_eeg_by_channel_groups(
     ymin=-20, ymax=20,
     ncols=4,
     window_highlights=[(0.010, 0.035, 'orange', 0.3), (0.090, 0.190, 'yellow', 0.3)],
-    split_groups=1
+    split_groups=4
 )
 
-
-
-
-
-
-
-
-# Calc matrix correlation
-
+'''
+##### Just exploring ........
+'''
 
 # Plot 10 teps for selected EEG channels
 
+# Select the first 10 epochs only
+epochs_first10 = epochs_clean[:10]
+
+# Compute the average evoked response from these first 10 epochs
+evoked_first10 = epochs_first10.average()
+
+# Plot evoked potentials for all EEG channels
+pf.plot_evoked_eeg_by_channel_groups(
+    evoked_first10,
+    tmin=-0.1, tmax=0.35,
+    ymin=-20, ymax=20,
+    ncols=4,
+    window_highlights=[(0.010, 0.035, 'orange', 0.3), (0.090, 0.190, 'yellow', 0.3)],
+    split_groups=4
+)
+
+# Calc matrix correlation
 
 
 

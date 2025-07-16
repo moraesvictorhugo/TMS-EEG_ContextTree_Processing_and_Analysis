@@ -166,7 +166,7 @@ epochs_clean = ica.apply(epochs.copy())
 '''
 
 '''
-##### (Optional) Second ICA
+##### (Optional) Second ICA (Infomax)
 '''
 # Apply ICA (Infomax)
 ica = mne.preprocessing.ICA(method='infomax', n_components=20, random_state=97)

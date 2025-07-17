@@ -185,7 +185,7 @@ ica.plot_sources(epochs_clean, show_scrollbars=False, block=True)
 ica.exclude = [3, 6, 7, 10, 19]
 epochs_clean = ica.apply(epochs_clean.copy())
 
-Plot cleaned epochs
+# Plot cleaned epochs
 epochs_clean.plot(block = True)
 
 '''

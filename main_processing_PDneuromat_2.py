@@ -97,14 +97,20 @@ filt_eeg_data = raw.copy().filter(l_freq=eeg_highpass_filt, h_freq=eeg_lowpass_f
     'TP10', 'AFz', 'FCz'
 ], fir_design='firwin')
 
+# Define the frequencies for the notch filter to remove powerline noise and harmonics
+freqs = (60, 120, 180, 240)
+
 # Notch filter in EEG data
-filt_eeg_data = raw.notch_filter(freqs=60, picks=raw.ch_names)
+filt_eeg_data = filt_eeg_data.notch_filter(freqs=freqs, picks=raw.ch_names)
+
+# Plot PSD 
+# filt_eeg_data.plot_psd(fmax=500)
 
 '''
 ##### Create epochs
 '''
 # Create epochs
-epochs = mne.Epochs(raw, events_from_annot, event_dict, tmin=-0.8, tmax=0.8, preload=True)
+epochs = mne.Epochs(filt_eeg_data, events_from_annot, event_dict, tmin=-0.8, tmax=0.8, preload=True)
 
 # Plot epochs
 # epochs.plot(block = True)
@@ -147,7 +153,7 @@ ica = mne.preprocessing.ICA(n_components=20, random_state=97)
 ica.fit(epochs)
 
 # Plot ICA components
-# ica.plot_sources(epochs, show_scrollbars=False, block=True)
+ica.plot_sources(epochs, show_scrollbars=False, block=True)
 
 # Get fraction of variance explained by all components
 explained_var_ratio = ica.get_explained_variance_ratio(epochs)
@@ -155,7 +161,7 @@ for channel_type, ratio in explained_var_ratio.items():
     print(f"Fraction of {channel_type} variance explained by all components: {ratio}")
 
 ##### Remove bad components
-ica.exclude = [0, 1, 10, 13]
+ica.exclude = [0, 1, 10, 12]               # Indices of the bad components can change in each run
 epochs_clean = ica.apply(epochs.copy())
 
 # Plot cleaned epochs
@@ -173,14 +179,14 @@ ica = mne.preprocessing.ICA(method='infomax', n_components=20, random_state=97)
 ica.fit(epochs_clean)
 
 # Plot ICA components
-# ica.plot_sources(epochs_clean, show_scrollbars=False, block=True)
+ica.plot_sources(epochs_clean, show_scrollbars=False, block=True)
 
 # Remove bad components
 ica.exclude = [3, 6, 7, 10, 19]
 epochs_clean = ica.apply(epochs_clean.copy())
 
-# Plot cleaned epochs
-# epochs_clean.plot(block = True)
+Plot cleaned epochs
+epochs_clean.plot(block = True)
 
 '''
 ##### (Optional) SSP

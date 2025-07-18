@@ -131,7 +131,7 @@ pf.plot_evoked_eeg_by_channel_groups(
     ymin=-20, ymax=20,
     ncols=4,
     window_highlights=[(0.010, 0.035, 'orange', 0.3), (0.090, 0.190, 'yellow', 0.3)],
-    split_groups=8
+    split_groups=4
 )
 
 '''
@@ -217,7 +217,7 @@ pf.plot_evoked_eeg_by_channel_groups(
     ymin=-20, ymax=20,
     ncols=4,
     window_highlights=[(0.010, 0.035, 'orange', 0.3), (0.090, 0.190, 'yellow', 0.3)],
-    split_groups=8
+    split_groups=4
 )
 
 '''
@@ -239,7 +239,7 @@ pf.plot_evoked_eeg_by_channel_groups(
     ymin=-20, ymax=20,
     ncols=4,
     window_highlights=[(0.010, 0.035, 'orange', 0.3), (0.090, 0.190, 'yellow', 0.3)],
-    split_groups=8
+    split_groups=4
 )
 
 # Calc matrix correlation

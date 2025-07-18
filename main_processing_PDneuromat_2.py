@@ -131,7 +131,7 @@ pf.plot_evoked_eeg_by_channel_groups(
     ymin=-20, ymax=20,
     ncols=4,
     window_highlights=[(0.010, 0.035, 'orange', 0.3), (0.090, 0.190, 'yellow', 0.3)],
-    split_groups=4
+    split_groups=8
 )
 
 '''
@@ -161,7 +161,7 @@ for channel_type, ratio in explained_var_ratio.items():
     print(f"Fraction of {channel_type} variance explained by all components: {ratio}")
 
 ##### Remove bad components
-ica.exclude = [0, 1, 10, 12]               # Indices of the bad components can change in each run
+ica.exclude = [0, 1, 10, 11]               # Indices of the bad components can change in each run
 epochs_clean = ica.apply(epochs.copy())
 
 # Plot cleaned epochs
@@ -217,7 +217,7 @@ pf.plot_evoked_eeg_by_channel_groups(
     ymin=-20, ymax=20,
     ncols=4,
     window_highlights=[(0.010, 0.035, 'orange', 0.3), (0.090, 0.190, 'yellow', 0.3)],
-    split_groups=4
+    split_groups=8
 )
 
 '''
@@ -239,7 +239,7 @@ pf.plot_evoked_eeg_by_channel_groups(
     ymin=-20, ymax=20,
     ncols=4,
     window_highlights=[(0.010, 0.035, 'orange', 0.3), (0.090, 0.190, 'yellow', 0.3)],
-    split_groups=4
+    split_groups=8
 )
 
 # Calc matrix correlation

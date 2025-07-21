@@ -3,7 +3,6 @@ Pipeline Analysis based on:
 
 https://pypi.org/project/tmseegpy/0.2.1/
 '''
-
 import mne
 import numpy as np
 import matplotlib.pyplot as plt

@@ -30,7 +30,7 @@ print(raw.ch_names)
 raw.set_channel_types({'EMG': 'emg', 'EOG': 'eog'})  # Adjust names as per your data
 
 # Drop non EEG channels
-raw.drop_channels(['EMG', 'EOG'])
+raw.drop_channels(['EOG'])
 
 '''
 ##### Find and create events
@@ -70,14 +70,14 @@ pf.plot_evoked_eeg_by_channel_groups(
     split_groups=4
 )
 
-# Plot first 10 epochs
-average_10_epochs = epochs[:10]
+# # Plot first 10 epochs
+# average_10_epochs = epochs[:10]
 
-pf.plot_evoked_eeg_by_channel_groups(
-    average_10_epochs,
-    tmin=-0.1, tmax=0.35,
-    ymin=-20, ymax=20,
-    ncols=4,
-    window_highlights=[(0.010, 0.035, 'orange', 0.3), (0.090, 0.190, 'yellow', 0.3)],
-    split_groups=4
-)
+# pf.plot_evoked_eeg_by_channel_groups(
+#     average_10_epochs,
+#     tmin=-0.1, tmax=0.35,
+#     ymin=-20, ymax=20,
+#     ncols=4,
+#     window_highlights=[(0.010, 0.035, 'orange', 0.3), (0.090, 0.190, 'yellow', 0.3)],
+#     split_groups=4
+# )

@@ -173,19 +173,19 @@ epochs_clean = ica.apply(epochs.copy())
 '''
 ##### (Optional) Second ICA (Infomax)
 '''
-# Apply ICA (Infomax)
-ica = mne.preprocessing.ICA(method='infomax', n_components=20, random_state=97)
-ica.fit(epochs_clean)
+# # Apply ICA (Infomax)
+# ica = mne.preprocessing.ICA(method='infomax', n_components=20, random_state=97)
+# ica.fit(epochs_clean)
 
-# Plot ICA components
-ica.plot_sources(epochs_clean, show_scrollbars=False, block=True)
+# # Plot ICA components
+# ica.plot_sources(epochs_clean, show_scrollbars=False, block=True)
 
-# Remove bad components
-ica.exclude = [3, 6, 7, 10, 19]
-epochs_clean = ica.apply(epochs_clean.copy())
+# # Remove bad components
+# ica.exclude = [3, 6, 7, 10, 19]
+# epochs_clean = ica.apply(epochs_clean.copy())
 
 # Plot cleaned epochs
-epochs_clean.plot(block = True)
+# epochs_clean.plot(block = True)
 
 '''
 ##### (Optional) SSP

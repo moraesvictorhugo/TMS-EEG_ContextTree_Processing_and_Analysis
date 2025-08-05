@@ -43,7 +43,8 @@ Order of steps
 ##### Load data
 '''
 # Construct the relative path to the EDF file and read it
-file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/TEPs_2025.07.08.bdf'
+# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/TEPs_2025.07.08.bdf'
+file_path = '/home/victormoraes/Downloads/Carlo-TEP-120%-2025.07.30.bdf'
 
 raw = mne.io.read_raw_bdf(file_path, preload=True)
 
@@ -54,10 +55,14 @@ print(raw.ch_names)
 # raw.plot(block=True)
 
 # Adjust channel types
-raw.set_channel_types({'EMG': 'emg', 'EOG': 'eog'})  # Adjust names as per your data
+raw.set_channel_types({'emg': 'emg', 'eog': 'eog'})  # Adjust names as per your data
+
+
+# raw.plot(block=True, picks=['emg', 'eog'])
+
 
 # Drop non EEG channels
-raw.drop_channels(['EMG', 'EOG'])
+# raw.drop_channels(['EMG', 'EOG'])
 
 '''
 ##### Find and create events
@@ -103,7 +108,7 @@ freqs = (60, 120, 180, 240)
 filt_eeg_data = filt_eeg_data.notch_filter(freqs=freqs, picks=raw.ch_names)
 
 # Plot PSD 
-# filt_eeg_data.plot_psd(fmax=500)
+filt_eeg_data.plot_psd(fmax=500)
 
 '''
 ##### Create epochs
@@ -112,7 +117,7 @@ filt_eeg_data = filt_eeg_data.notch_filter(freqs=freqs, picks=raw.ch_names)
 epochs = mne.Epochs(filt_eeg_data, events_from_annot, event_dict, tmin=-0.8, tmax=0.8, preload=True)
 
 # Plot epochs
-# epochs.plot(block = True)
+epochs.plot(block = True)
 
 '''
 ##### Average reference
@@ -160,11 +165,11 @@ for channel_type, ratio in explained_var_ratio.items():
     print(f"Fraction of {channel_type} variance explained by all components: {ratio}")
 
 ##### Remove bad components
-ica.exclude = [0, 1, 10, 11]               # Indices of the bad components can change in each run
+ica.exclude = [0, 1, 2, 3, 4, 6, 7, 9]               # Indices of the bad components can change in each run
 epochs_clean = ica.apply(epochs.copy())
 
 # Plot cleaned epochs
-# epochs_clean.plot(block = True)
+epochs_clean.plot(block = True)
 
 '''
 ##### (Optional and very experimental) PARAFAC decomposition

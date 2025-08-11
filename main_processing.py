@@ -18,6 +18,7 @@ from mne_icalabel import label_components
 from modules import plot_functions as pf
 
 '''
+
 Order of steps
 
     Load data                                                                                    
@@ -43,8 +44,8 @@ Order of steps
 ##### Load data
 '''
 # Construct the relative path to the EDF file and read it
-# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/TEPs_2025.07.08.bdf'
-file_path = '/home/victormoraes/Downloads/Carlo-TEP-120%-2025.07.30.bdf'
+file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/TEPs_2025.07.08.bdf'
+# file_path = '/home/victormoraes/Downloads/Carlo-TEP-120%-2025.07.30.bdf'
 
 raw = mne.io.read_raw_bdf(file_path, preload=True)
 
@@ -55,8 +56,8 @@ print(raw.ch_names)
 # raw.plot(block=True)
 
 # Adjust channel types
-raw.set_channel_types({'emg': 'emg', 'eog': 'eog'})  # Adjust names as per your data
-
+# raw.set_channel_types({'emg': 'emg', 'eog': 'eog'})  # Adjust names as per your data
+raw.set_channel_types({'EMG': 'emg', 'EOG': 'eog'})
 
 # raw.plot(block=True, picks=['emg', 'eog'])
 

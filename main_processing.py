@@ -16,6 +16,7 @@ import seaborn as sns
 from mne.preprocessing import ICA
 from mne_icalabel import label_components
 from modules import plot_functions as pf
+from modules import processing_functions as pcf
 
 '''
 
@@ -109,7 +110,7 @@ freqs = (60, 120, 180, 240)
 filt_eeg_data = filt_eeg_data.notch_filter(freqs=freqs, picks=raw.ch_names)
 
 # Plot PSD 
-filt_eeg_data.plot_psd(fmax=500)
+# filt_eeg_data.plot_psd(fmax=500)
 
 '''
 ##### Create epochs
@@ -118,7 +119,7 @@ filt_eeg_data.plot_psd(fmax=500)
 epochs = mne.Epochs(filt_eeg_data, events_from_annot, event_dict, tmin=-0.8, tmax=0.8, preload=True)
 
 # Plot epochs
-epochs.plot(block = True)
+# epochs.plot(block = True)
 
 '''
 ##### Average reference
@@ -128,16 +129,16 @@ epochs.set_eeg_reference('average')
 '''
 ##### Plot TEPs before ICA (Temporary)
 '''
-# Plot raw TEPs
-epochs_beforeICA = epochs.average()
-pf.plot_evoked_eeg_by_channel_groups(
-    epochs_beforeICA,
-    tmin=-0.1, tmax=0.35,
-    ymin=-20, ymax=20,
-    ncols=4,
-    window_highlights=[(0.010, 0.035, 'orange', 0.3), (0.090, 0.190, 'yellow', 0.3)],
-    split_groups=4
-)
+# # Plot raw TEPs
+# epochs_beforeICA = epochs.average()
+# pf.plot_evoked_eeg_by_channel_groups(
+#     epochs_beforeICA,
+#     tmin=-0.1, tmax=0.35,
+#     ymin=-20, ymax=20,
+#     ncols=4,
+#     window_highlights=[(0.010, 0.035, 'orange', 0.3), (0.090, 0.190, 'yellow', 0.3)],
+#     split_groups=4
+# )
 
 '''
 ##### Remove bad or unused channels 
@@ -166,7 +167,7 @@ for channel_type, ratio in explained_var_ratio.items():
     print(f"Fraction of {channel_type} variance explained by all components: {ratio}")
 
 ##### Remove bad components
-ica.exclude = [0, 1, 2, 3, 4, 6, 7, 9]               # Indices of the bad components can change in each run
+ica.exclude = [0, 1, 10, 11]               # Indices of the bad components can change in each run
 epochs_clean = ica.apply(epochs.copy())
 
 # Plot cleaned epochs
@@ -210,20 +211,56 @@ epochs_clean = epochs_clean.copy().filter(l_freq=None, h_freq=45)
 epochs_clean = epochs_clean.copy().resample(725)
 
 '''
-##### Plot TEPs after ICA
+##### Plot average TEPs after ICA
 '''
-# Compute average evoked response
-evoked = epochs_clean.average()
+# # Compute average evoked response
+# evoked = epochs_clean.average()
 
-# Plot evoked potentials for all EEG channels
-pf.plot_evoked_eeg_by_channel_groups(
-    evoked,
-    tmin=-0.1, tmax=0.35,
-    ymin=-20, ymax=20,
-    ncols=4,
-    window_highlights=[(0.010, 0.035, 'orange', 0.3), (0.090, 0.190, 'yellow', 0.3)],
-    split_groups=4
-)
+# # Plot evoked potentials for all EEG channels
+# pf.plot_evoked_eeg_by_channel_groups(
+#     evoked,
+#     tmin=-0.1, tmax=0.35,
+#     ymin=-20, ymax=20,
+#     ncols=4,
+#     window_highlights=[(0.010, 0.035, 'orange', 0.3), (0.090, 0.190, 'yellow', 0.3)],
+#     split_groups=4
+# )
+
+'''
+##### Feature extraction ........
+'''
+# Calculate peak to peak amplitudes in C3 electrode for all epochs
+ptp_values = pcf.peak_to_peak_amplitudes(epochs_clean)
+
+# Convert from mV to uV
+ptp_values = ptp_values * 1000
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 '''
 ##### Just exploring ........

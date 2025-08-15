@@ -159,7 +159,7 @@ ica = mne.preprocessing.ICA(n_components=20, random_state=97)
 ica.fit(epochs)
 
 # Plot ICA components
-ica.plot_sources(epochs, show_scrollbars=False, block=True)
+# ica.plot_sources(epochs, show_scrollbars=False, block=True)
 
 # Get fraction of variance explained by all components
 explained_var_ratio = ica.get_explained_variance_ratio(epochs)
@@ -171,7 +171,7 @@ ica.exclude = [0, 1, 10, 11]               # Indices of the bad components can c
 epochs_clean = ica.apply(epochs.copy())
 
 # Plot cleaned epochs
-epochs_clean.plot(block = True)
+# epochs_clean.plot(block = True)
 
 '''
 ##### (Optional and very experimental) PARAFAC decomposition
@@ -214,7 +214,7 @@ epochs_clean = epochs_clean.copy().resample(725)
 ##### Plot average TEPs after ICA
 '''
 # # Compute average evoked response
-# evoked = epochs_clean.average()
+evoked = epochs_clean.average()
 
 # # Plot evoked potentials for all EEG channels
 # pf.plot_evoked_eeg_by_channel_groups(
@@ -229,20 +229,10 @@ epochs_clean = epochs_clean.copy().resample(725)
 '''
 ##### Feature extraction ........
 '''
-# Calculate peak to peak amplitudes in C3 electrode for all epochs
-ptp_values = pcf.peak_to_peak_amplitudes(epochs_clean)
-
-# Convert from mV to uV
-ptp_values = ptp_values * 1000
-
-
-
-
-
-
-
-
-
+# # Calculate peak to peak amplitudes evoked response in C3 electrode and convert to uV
+ptp_value = pcf.peak_to_peak_amplitude_evoked(evoked, channel_name='T7', tmin=0.01, tmax=0.045)
+ptp_value = ptp_value * 1e6
+print(f"Peak-to-peak amplitude after averaging (uV): {ptp_value}")
 
 
 

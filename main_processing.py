@@ -227,12 +227,65 @@ evoked = epochs_clean.average()
 # )
 
 '''
-##### Feature extraction ........
+##### Calculate peak to peak amplitudes
 '''
 # # Calculate peak to peak amplitudes evoked response in C3 electrode and convert to uV
-ptp_value = pcf.peak_to_peak_amplitude_evoked(evoked, channel_name='T7', tmin=0.01, tmax=0.045)
+ptp_value = pcf.peak_to_peak_amplitude_evoked(evoked, channel_name='C3', tmin=0.01, tmax=0.040)
 ptp_value = ptp_value * 1e6
-print(f"Peak-to-peak amplitude after averaging (uV): {ptp_value}")
+# print(f"Peak-to-peak amplitude after averaging (uV): {ptp_value}")
+
+
+
+
+
+
+
+
+# Time-frequency analysis of TMS-evoked potentials using Morlet wavelets
+frequencies = np.arange(1, 45, 3)  # frequencies from 7 to 30 Hz, step 3 Hz
+n_cycles = frequencies / 2.0  # number of cycles per frequency
+
+# Compute induced power using Morlet wavelets, average across trials
+power = epochs_clean.compute_tfr('morlet', freqs=frequencies, n_cycles=n_cycles,
+                           use_fft=True, return_itc=False, decim=3, average=True)
+
+# Optionally baseline correct power (e.g., using -0.2 to 0 seconds pre-stimulus)
+power.apply_baseline(baseline=(-0.2, 0), mode='logratio')
+
+# Plot time-frequency power for all channels
+for ch_name in power.ch_names:
+    power.plot(picks=[ch_name], title=f'Time-Frequency Power (Morlet) - Channel: {ch_name}')
+    plt.show()  # Ensure each plot is displayed separately
+
+
+
+
+
+
+
+
+
+
+# Compute PLV or coherence between channels across trials, per frequency/time
+
+from mne.connectivity import spectral_connectivity
+
+# Define frequencies and time window
+fmin, fmax = 3, 13
+tmin, tmax = 0.08, 0.12  # early window
+
+con, freqs, times, n_epochs, n_tapers = spectral_connectivity(
+    epochs_clean, method='plv', mode='fourier', sfreq=epochs_clean.info['sfreq'],
+    fmin=fmin, fmax=fmax, tmin=tmin, tmax=tmax, faverage=True, mt_adaptive=False,
+    n_jobs=1)
+
+# con is a connectivity matrix between all channel pairs in this band and time
+
+# Repeat for late window and compare connectivity patterns
+
+
+
+
 
 
 
@@ -256,25 +309,25 @@ print(f"Peak-to-peak amplitude after averaging (uV): {ptp_value}")
 ##### Just exploring ........
 '''
 
-# Plot 10 processed teps for selected EEG channels
+# # Plot 10 processed teps for selected EEG channels
 
-# Select the first 10 epochs only
-epochs_first10 = epochs_clean[:10]
+# # Select the first 10 epochs only
+# epochs_first10 = epochs_clean[:10]
 
-# Compute the average evoked response from these first 10 epochs
-evoked_first10 = epochs_first10.average()
+# # Compute the average evoked response from these first 10 epochs
+# evoked_first10 = epochs_first10.average()
 
-# Plot evoked potentials for all EEG channels
-pf.plot_evoked_eeg_by_channel_groups(
-    evoked_first10,
-    tmin=-0.1, tmax=0.35,
-    ymin=-20, ymax=20,
-    ncols=4,
-    window_highlights=[(0.010, 0.035, 'orange', 0.3), (0.090, 0.190, 'yellow', 0.3)],
-    split_groups=4
-)
+# # Plot evoked potentials for all EEG channels
+# pf.plot_evoked_eeg_by_channel_groups(
+#     evoked_first10,
+#     tmin=-0.1, tmax=0.35,
+#     ymin=-20, ymax=20,
+#     ncols=4,
+#     window_highlights=[(0.010, 0.035, 'orange', 0.3), (0.090, 0.190, 'yellow', 0.3)],
+#     split_groups=4
+# )
 
-# Calc matrix correlation
+# # Calc matrix correlation
 
 
 

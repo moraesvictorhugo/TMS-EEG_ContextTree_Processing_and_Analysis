@@ -213,8 +213,9 @@ epochs_clean = epochs_clean.copy().resample(725)
 '''
 ##### Plot average TEPs after ICA
 '''
-# # Compute average evoked response
+# # Compute average and standard deviation evoked response
 evoked = epochs_clean.average()
+std_evoked = epochs_clean.get_data().std(axis=0)
 
 # # Plot evoked potentials for all EEG channels
 # pf.plot_evoked_eeg_by_channel_groups(
@@ -226,21 +227,21 @@ evoked = epochs_clean.average()
 #     split_groups=4
 # )
 
+# Plot evoked potential for C3 electrode with standard deviation shading
+pf.plot_evoked_with_std(epochs_clean, std_evoked, 'C3', tmin=-0.1, tmax=0.35,
+                     highlight_window=(0.015, 0.040))
+
 '''
 ##### Calculate peak to peak amplitudes
 '''
 # # Calculate peak to peak amplitudes evoked response in C3 electrode and convert to uV
 ptp_value = pcf.peak_to_peak_amplitude_evoked(evoked, channel_name='C3', tmin=0.01, tmax=0.040)
 ptp_value = ptp_value * 1e6
-# print(f"Peak-to-peak amplitude after averaging (uV): {ptp_value}")
+print(f"Peak-to-peak amplitude after averaging (uV): {ptp_value}")
 
-
-
-
-
-
-
-
+'''
+##### Time-frequency analysis  --- needs to be finished!
+'''
 # Time-frequency analysis of TMS-evoked potentials using Morlet wavelets
 frequencies = np.arange(1, 45, 3)  # frequencies from 7 to 30 Hz, step 3 Hz
 n_cycles = frequencies / 2.0  # number of cycles per frequency
@@ -256,39 +257,6 @@ power.apply_baseline(baseline=(-0.2, 0), mode='logratio')
 for ch_name in power.ch_names:
     power.plot(picks=[ch_name], title=f'Time-Frequency Power (Morlet) - Channel: {ch_name}')
     plt.show()  # Ensure each plot is displayed separately
-
-
-
-
-
-
-
-
-
-
-# Compute PLV or coherence between channels across trials, per frequency/time
-
-from mne.connectivity import spectral_connectivity
-
-# Define frequencies and time window
-fmin, fmax = 3, 13
-tmin, tmax = 0.08, 0.12  # early window
-
-con, freqs, times, n_epochs, n_tapers = spectral_connectivity(
-    epochs_clean, method='plv', mode='fourier', sfreq=epochs_clean.info['sfreq'],
-    fmin=fmin, fmax=fmax, tmin=tmin, tmax=tmax, faverage=True, mt_adaptive=False,
-    n_jobs=1)
-
-# con is a connectivity matrix between all channel pairs in this band and time
-
-# Repeat for late window and compare connectivity patterns
-
-
-
-
-
-
-
 
 
 

@@ -91,3 +91,52 @@ def plot_evoked_eeg_by_channel_groups(
         plt.suptitle(f"{suptitle_base} - Window {win_idx}")
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         plt.show()
+def plot_evoked_with_std(epochs, std_data, channel_name, tmin=None, tmax=None,
+                         highlight_window=None):
+    """
+    Plot the evoked response with standard deviation shading for a given channel.
+
+    Parameters:
+    -----------
+    epochs : mne.Epochs
+        The cleaned epochs object containing the EEG data.
+    std_data : np.ndarray
+        Standard deviation array with shape (n_channels, n_times).
+    channel_name : str
+        The channel name to plot (e.g., 'C3').
+    tmin : float or None
+        Start time (in seconds) of the time window to plot. If None, plot from start of epochs.
+    tmax : float or None
+        End time (in seconds) of the time window to plot. If None, plot until end of epochs.
+    highlight_window : tuple or None
+        Tuple of (start_time, end_time) in seconds for the highlighted region.
+    """
+    times = epochs.times
+
+    if tmin is not None and tmax is not None:
+        time_mask = (times >= tmin) & (times <= tmax)
+    else:
+        time_mask = slice(None)
+
+    idx = epochs.ch_names.index(channel_name)
+    mean_data = epochs.average().data[idx]
+    std_dev = std_data[idx]
+
+    plt.figure(figsize=(10, 6), dpi=300)
+    plt.plot(times[time_mask], mean_data[time_mask] * 1e6, label='Mean (µV)')
+    plt.fill_between(times[time_mask],
+                     (mean_data[time_mask] - std_dev[time_mask]) * 1e6,
+                     (mean_data[time_mask] + std_dev[time_mask]) * 1e6,
+                     alpha=0.3, label='±1 Std Dev')
+
+    # Highlight the specified time window if provided
+    if highlight_window is not None:
+        plt.axvspan(highlight_window[0], highlight_window[1], color='orange', alpha=0.3)
+
+    plt.axvline(x=0, color='k', linestyle='--', linewidth=1)
+
+    plt.xlabel('Time (s)')
+    plt.ylabel('Amplitude (µV)')
+    plt.title(f'Evoked response at {channel_name} with variability')
+    plt.legend()
+    plt.show()

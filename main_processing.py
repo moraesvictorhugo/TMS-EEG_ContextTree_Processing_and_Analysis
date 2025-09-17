@@ -227,9 +227,9 @@ std_evoked = epochs_clean.get_data().std(axis=0)
 #     split_groups=4
 # )
 
-# Plot evoked potential for C3 electrode with standard deviation shading
-pf.plot_evoked_with_std(epochs_clean, std_evoked, 'C3', tmin=-0.1, tmax=0.35,
-                     highlight_window=(0.015, 0.040))
+# # Plot evoked potential for C3 electrode with standard deviation shading
+# pf.plot_evoked_with_std(epochs_clean, std_evoked, 'C3', tmin=-0.1, tmax=0.35,
+#                      highlight_window=(0.015, 0.040))
 
 '''
 ##### Calculate peak to peak amplitudes
@@ -240,8 +240,47 @@ ptp_value = ptp_value * 1e6
 print(f"Peak-to-peak amplitude after averaging (uV): {ptp_value}")
 
 '''
-##### Time-frequency analysis  --- needs to be finished!
+##### Phase synchrony analysis
 '''
+
+from mne_connectivity import spectral_connectivity_epochs
+import numpy as np
+
+# Define analysis parameters for phase synchrony
+seed_electrode = 'C3'  # primary motor cortex electrode
+freq_band = (1, 45)    # 
+tmin_sync, tmax_sync = 0.010, 0.045  # N15-P30 latency window
+
+# Crop epochs to N15-P30 window
+epochs_sync = epochs_clean.copy().crop(tmin=tmin_sync, tmax=tmax_sync)
+
+# Find index of the seed electrode
+seed_idx = epochs_sync.ch_names.index(seed_electrode)
+
+# Extract epoch data as numpy array: (n_epochs, n_channels, n_times)
+data = epochs_sync.get_data()
+
+# Create indices tuple for connectivity calculation
+# We want connectivity between seed and all other channels
+indices = (np.full(len(epochs_sync.ch_names), seed_idx), np.arange(len(epochs_sync.ch_names)))
+
+# Compute phase locking value (PLV) between seed and all other electrodes in alpha band
+con = spectral_connectivity_epochs(
+    data, sfreq=epochs_sync.info['sfreq'], method='plv', mode='fourier',
+    fmin=freq_band[0], fmax=freq_band[1], faverage=True, tmin=tmin_sync, tmax=tmax_sync,
+    indices=indices, n_jobs=1)
+
+# 'con' is a SpectralConnectivity object with PLV values of shape (n_connections, n_freqs)
+
+# Print PLV values between C3 and all other electrodes (only one frequency bin since faverage=True)
+print("\nPhase Locking Value (PLV) between C3 and other electrodes (alpha band, 15-40ms):")
+for ch_idx, ch_name in enumerate(epochs_sync.ch_names):
+    print(f'{seed_electrode} <-> {ch_name}: {con.get_data()[ch_idx, 0]:.3f}')
+
+
+'''
+##### Time-frequency analysis  --- needs to be finished!
+'''    
 # Time-frequency analysis of TMS-evoked potentials using Morlet wavelets
 frequencies = np.arange(1, 45, 3)  # frequencies from 7 to 30 Hz, step 3 Hz
 n_cycles = frequencies / 2.0  # number of cycles per frequency
@@ -251,57 +290,9 @@ power = epochs_clean.compute_tfr('morlet', freqs=frequencies, n_cycles=n_cycles,
                            use_fft=True, return_itc=False, decim=3, average=True)
 
 # Optionally baseline correct power (e.g., using -0.2 to 0 seconds pre-stimulus)
-power.apply_baseline(baseline=(-0.2, 0), mode='logratio')
+power.apply_baseline(baseline=(-0.1, 0), mode='logratio')
 
 # Plot time-frequency power for all channels
 for ch_name in power.ch_names:
     power.plot(picks=[ch_name], title=f'Time-Frequency Power (Morlet) - Channel: {ch_name}')
     plt.show()  # Ensure each plot is displayed separately
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-'''
-##### Just exploring ........
-'''
-
-# # Plot 10 processed teps for selected EEG channels
-
-# # Select the first 10 epochs only
-# epochs_first10 = epochs_clean[:10]
-
-# # Compute the average evoked response from these first 10 epochs
-# evoked_first10 = epochs_first10.average()
-
-# # Plot evoked potentials for all EEG channels
-# pf.plot_evoked_eeg_by_channel_groups(
-#     evoked_first10,
-#     tmin=-0.1, tmax=0.35,
-#     ymin=-20, ymax=20,
-#     ncols=4,
-#     window_highlights=[(0.010, 0.035, 'orange', 0.3), (0.090, 0.190, 'yellow', 0.3)],
-#     split_groups=4
-# )
-
-# # Calc matrix correlation
-
-
-
-
-
-
-
-
-

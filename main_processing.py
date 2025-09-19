@@ -187,6 +187,9 @@ epochs_clean.plot(block = True)
 
 ##### Developing ---------------------------------------------------------------
 
+### The artifact component should be excluded manually
+
+
 # Plot ICA components
 ica.plot_sources(epochs, show_scrollbars=False, block=True)
 

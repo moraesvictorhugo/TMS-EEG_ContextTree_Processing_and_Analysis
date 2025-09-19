@@ -168,7 +168,7 @@ raw.set_montage(montage)
 epochs.set_montage(montage)
 
 # Label components
-IClabel = label_components(inst=epochs, ica=ica, method='iclabel')
+label_components(inst=epochs, ica=ica, method='iclabel')
 
 # Extract labels from ICA object
 labels = ica.labels_

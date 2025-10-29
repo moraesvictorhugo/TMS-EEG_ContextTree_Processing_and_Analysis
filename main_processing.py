@@ -7,7 +7,7 @@ import mne
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
-matplotlib.use('TkAgg') # Qt5Agg
+matplotlib.use('Qt5Agg') # TkAgg
 from scipy.signal import butter, iirnotch, sosfilt, zpk2sos
 from scipy import signal
 import os
@@ -19,7 +19,6 @@ from modules import plot_functions as pf
 from modules import processing_functions as pcf
 
 '''
-
 Order of steps
 
     Load data                                                                                    
@@ -47,7 +46,10 @@ Order of steps
 # Construct the relative path to the EDF file and read it
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/TEPs_2025.07.08.bdf'             # Pilot 1
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Carlo-TEP-120%-2025.07.30.bdf'   # Pilot 2
-file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/120%rmt.bdf'                       # Pilot 3
+# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/120%rmt.bdf'                       # Pilot 3
+# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_13-10-25/100_Limiar_50_pulsos.bdf'      # Pilot 4
+# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_13-10-25/120_Limiar_50_pulsos.bdf'      # Pilot 4
+file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_24-10-25/com_ruido.bdf'
 
 raw = mne.io.read_raw_bdf(file_path, preload=True)
 
@@ -55,17 +57,17 @@ raw = mne.io.read_raw_bdf(file_path, preload=True)
 print(raw.info)
 print(raw.ch_names)
 
-raw.plot(block=True)
+# raw.plot(block=True, picks=['C3', 'C4'])
 
 # Adjust channel types
 # raw.set_channel_types({'EMG': 'emg', 'EOG': 'eog'})  # Adjust names for Pilot 1
-raw.set_channel_types({'emg': 'emg', 'eog': 'eog'})    # Adjust names for Pilot 2 and 3
+# raw.set_channel_types({'emg': 'emg', 'eog': 'eog'})    # Adjust names for Pilot 2 and 3
 
-# raw.plot(block=True, picks=['emg', 'eog'])
+# raw.plot(block=True, picks=['EMG'])
 
 # Drop non EEG channels
-# raw.drop_channels(['EMG', 'EOG'])  # For Pilot 1
-raw.drop_channels(['emg', 'eog'])  # For Pilot 2 and 3
+raw.drop_channels(['EMG', 'EOG'])    # For Pilot 1
+# raw.drop_channels(['emg', 'eog'])  # For Pilot 2 and 3
 
 '''
 ##### Find and create events
@@ -102,7 +104,7 @@ filt_eeg_data = raw.copy().filter(l_freq=eeg_highpass_filt, h_freq=eeg_lowpass_f
                                   picks= raw.ch_names, fir_design='firwin')
 
 # Define the frequencies for the notch filter to remove powerline noise and harmonics
-freqs = (60, 120, 180, 240)
+freqs = (60, 120, 180, 240, 300)
 
 # Notch filter in EEG data
 filt_eeg_data = filt_eeg_data.notch_filter(freqs=freqs, picks=raw.ch_names)
@@ -158,38 +160,36 @@ ica.fit(epochs)
 
 ##### Developing ---------------------------------------------------------------
 # IClabel
-from mne_icalabel import label_components
+# from mne_icalabel import label_components
 
-# Create the standard 10-20 montage
-montage = mne.channels.make_standard_montage('standard_1020')
+# # Create the standard 10-20 montage
+# montage = mne.channels.make_standard_montage('standard_1020')
 
-# Set the montage to your raw data and epochs
-raw.set_montage(montage)
-epochs.set_montage(montage)
+# # Set the montage to your raw data and epochs
+# raw.set_montage(montage)
+# epochs.set_montage(montage)
 
-# Label components
-label_components(inst=epochs, ica=ica, method='iclabel')
+# # Label components
+# label_components(inst=epochs, ica=ica, method='iclabel')
 
-# Extract labels from ICA object
-labels = ica.labels_
+# # Extract labels from ICA object
+# labels = ica.labels_
 
-# Identify non-brain components: exclude all but 'brain' (and optionally 'other')
-exclude_components = [idx for idx, label in enumerate(labels) if label not in ['brain', 'other']]
+# # Identify non-brain components: exclude all but 'brain' (and optionally 'other')
+# exclude_components = [idx for idx, label in enumerate(labels) if label not in ['brain', 'other']]
 
-# Set components to exclude
-ica.exclude = exclude_components
+# # Set components to exclude
+# ica.exclude = exclude_components
 
-# Apply ICA to remove those components from the data
-epochs_clean = ica.apply(epochs.copy())
+# # Apply ICA to remove those components from the data
+# epochs_clean = ica.apply(epochs.copy())
 
-# Plot cleaned epochs
-epochs_clean.plot(block = True)
+# # Plot cleaned epochs
+# epochs_clean.plot(block = True)
 
 ##### Developing ---------------------------------------------------------------
 
 ### The artifact component should be excluded manually
-
-
 # Plot ICA components
 ica.plot_sources(epochs, show_scrollbars=False, block=True)
 
@@ -199,7 +199,7 @@ for channel_type, ratio in explained_var_ratio.items():
     print(f"Fraction of {channel_type} variance explained by all components: {ratio}")
 
 ##### Remove bad components
-ica.exclude = [0, 1, 2, 3, 4, 5, 16]               # Indices of the bad components can change in each run
+ica.exclude = [0, 1, 2, 4, 10]               # Indices of the bad components can change in each run
 epochs_clean = ica.apply(epochs.copy())
 
 # Plot cleaned epochs

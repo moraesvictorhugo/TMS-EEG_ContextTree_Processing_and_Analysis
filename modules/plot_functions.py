@@ -140,3 +140,63 @@ def plot_evoked_with_std(epochs, std_data, channel_name, tmin=None, tmax=None,
     plt.title(f'Evoked response at {channel_name} with variability')
     plt.legend()
     plt.show()
+
+def plot_average_epochs_grid(epochs, event_id, tmin=-0.100, tmax=0.350, ymin=-20, ymax=20, n_rows=3, n_cols=3):
+    """
+    Plot average epochs in grid layout with multiple windows if necessary.
+
+    Parameters:
+    - epochs: MNE Epochs object
+    - event_id: dict mapping event labels to IDs (e.g. {'stimulus_0': 0, ...})
+    - tmin, tmax: float, time window in seconds relative to event onset
+    - ymin, ymax: float, y-axis limits in microvolts
+    - n_rows, n_cols: int, number of rows and columns per figure window
+
+    This function computes evoked averages then plots average ERP per electrode (rows) and per condition (columns).
+    """
+    electrodes = epochs.ch_names
+    conditions = list(event_id.keys())
+
+    evokeds = {cond: epochs[cond].average() for cond in conditions}
+    times = evokeds[conditions[0]].times
+    time_mask = (times >= tmin) & (times <= tmax)
+
+    n_channels = len(electrodes)
+    n_per_page = n_rows  # each page shows n_rows electrodes
+    
+    # Helper function to plot one page of electrodes
+    def plot_page(electrodes_subset, page_num):
+        fig, axs = plt.subplots(n_rows, n_cols, figsize=(15, 10), sharex=True, sharey=True)
+        fig.suptitle(f'Page {page_num + 1}: Average ERP per electrode and stimulus', fontsize=16)
+
+        for i, ch_name in enumerate(electrodes_subset):
+            row = i % n_rows
+            for col, cond in enumerate(conditions):
+                ax = axs[row, col]
+                evoked = evokeds[cond]
+                ch_idx = evoked.ch_names.index(ch_name)
+
+                data = evoked.data[ch_idx, time_mask]
+                time = evoked.times[time_mask]
+
+                ax.plot(time * 1000, data * 1e6)  # time in ms, data in uV
+                ax.axvline(0, color='k', linestyle='--', linewidth=0.8)
+                ax.grid(True)
+
+                ax.set_xlim(tmin * 1000, tmax * 1000)
+                ax.set_ylim(ymin, ymax)
+
+                if row == 0:
+                    ax.set_title(cond)
+                if col == 0:
+                    ax.set_ylabel(ch_name)
+                if row == n_rows - 1:
+                    ax.set_xlabel('Time (ms)')
+
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.show()
+
+    # Iterate through electrodes with pagination
+    for page_num in range(0, n_channels, n_per_page):
+        electrodes_subset = electrodes[page_num:page_num + n_per_page]
+        plot_page(electrodes_subset, page_num // n_per_page)

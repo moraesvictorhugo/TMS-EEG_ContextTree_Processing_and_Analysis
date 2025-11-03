@@ -293,6 +293,12 @@ pf.plot_average_epochs_grid(epochs_clean, event_id, tmin=-0.1, tmax=0.35, ymin=-
 # pf.plot_evoked_with_std(epochs_clean, std_evoked, 'C3', tmin=-0.1, tmax=0.35,
 #                      highlight_window=(0.015, 0.040))
 
+#### TO-DO
+# Calculate average TEPs grouping clusters of electrodes for example:
+# C3, FC1, CP1, FC5, CP5, C1, FC3, CP3 and C5
+# C4, FC2, CP2, FC6, CP6, C2, FC4, CP4 and C6
+# This approach can potentially increase signal-to-noise ratio
+
 '''
 ##### Calculate peak to peak amplitudes
 '''

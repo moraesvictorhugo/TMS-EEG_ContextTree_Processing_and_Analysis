@@ -314,7 +314,6 @@ print(f"Peak-to-peak amplitude after averaging (uV): {ptp_value}")
 '''
 ##### Phase synchrony analysis
 '''
-
 from mne_connectivity import spectral_connectivity_epochs
 import numpy as np
 
@@ -348,7 +347,6 @@ con = spectral_connectivity_epochs(
 print("\nPhase Locking Value (PLV) between C3 and other electrodes (alpha band, 15-40ms):")
 for ch_idx, ch_name in enumerate(epochs_sync.ch_names):
     print(f'{seed_electrode} <-> {ch_name}: {con.get_data()[ch_idx, 0]:.3f}')
-
 
 '''
 ##### Time-frequency analysis  --- needs to be finished!

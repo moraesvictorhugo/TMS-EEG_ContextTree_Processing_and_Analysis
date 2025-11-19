@@ -41,55 +41,67 @@ Order of steps
 '''
 
 '''
+##### Setting Flags
+'''
+show_plots = True
+export_data = False
+tree_sequence = False
+path_tree_sequence = ''
+
+'''
 ##### Load data
 '''
 # Construct the relative path to the EDF file and read it
-file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/TEPs_2025.07.08.bdf'             # Pilot 1
-# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Carlo-TEP-120%-2025.07.30.bdf'   # Pilot 2
-# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/120%rmt.bdf'                       # Pilot 3
+# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/TEPs_2025.07.08.bdf'                           # Pilot 1
+# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Carlo-TEP-120%-2025.07.30.bdf'                 # Pilot 2
+# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/120%rmt.bdf'                                   # Pilot 3
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_13-10-25/100_Limiar_50_pulsos.bdf'      # Pilot 4
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_13-10-25/120_Limiar_50_pulsos.bdf'      # Pilot 4
-# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_24-10-25/com_ruido.bdf'
+# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_24-10-25/com_ruido.bdf'                 # Pilot 5
+file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_7-11-25/120MT_50P.bdf'                    # Pilot 6
 
 raw = mne.io.read_raw_bdf(file_path, preload=True)
 
 # Load txt file with event codes into a numpy array
-event_codes = np.loadtxt('/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_24-10-25/random_sequence_90.txt', dtype=int)
+if tree_sequence:
+    event_codes = np.loadtxt(path_tree_sequence, dtype=int)
 
 # Get metadata and channel names
 print(raw.info)
 print(raw.ch_names)
 
-raw.plot(block=True)
+if show_plots:
+    raw.plot(block=True)
 
 # Adjust channel types
-# raw.set_channel_types({'EMG': 'emg', 'EOG': 'eog'})  # Adjust names for Pilot 1
+raw.set_channel_types({'EMG': 'emg', 'EOG': 'eog'})  # Adjust names for Pilot 1
 # raw.set_channel_types({'emg': 'emg', 'eog': 'eog'})    # Adjust names for Pilot 2 and 3
 
-# raw.plot(block=True, picks=['EMG'])
-
 # Drop non EEG channels
-raw.drop_channels(['EMG', 'EOG', 'Iz', 'O2'])    # For Pilot 1
-# raw.drop_channels(['emg', 'eog'])  # For Pilot 2 and 3
+bad_ch =['P1', 'F2', 'F1', 'T8', 'TP8', 'TP7', 'TP9', 'PO8', 'PO7', 'FT8', 'FT7', 'P6', 'AF7', 'F5', 'F6', 'F8', 'C5', 'C6', 'FC4', 
+                'FC6', 'CP4', 'PO3', 'PO4', 'CP3', 'POz', 'AF8', 'C1', 'FC3', 'Oz', 'CPz', 'AF4', 'AF3', 'P5', 'Fpz', 'P2', 'C2']
+raw.drop_channels(bad_ch)    
+raw.drop_channels(['EMG', 'EOG'])  
 
 '''
 ##### Find and create events
 '''
 # Get events from annotations
-events_from_annot, _ = mne.events_from_annotations(raw)
+events_from_annot, event_dict = mne.events_from_annotations(raw)
 
 # Replace the event code in the third column of events_from_annot
-events_from_annot[:, 2] = event_codes
+if tree_sequence:
+    events_from_annot[:, 2] = event_codes
 
 # Define the event IDs
-event_id = {
-    'stimulus_0': 0,
-    'stimulus_1': 1,
-    'stimulus_2': 2
-}
-
-# Select the event of interest
-# target_event_id = event_dict['Stimulus A']  # replace with actual label from event_dict keys
+if tree_sequence:
+    event_id = {
+        'stimulus_0': 0,
+        'stimulus_1': 1,
+        'stimulus_2': 2
+    }
+else:
+    event_id = event_dict['Stimulus A']
 
 '''
 ##### Remove TMS artifact using baseline data
@@ -99,12 +111,14 @@ mne.preprocessing.fix_stim_artifact(
     raw,
     events=events_from_annot,
     event_id=event_id,
-    tmin=-0.002,
-    tmax=0.005,
+    tmin=-0.010,
+    tmax=0.010,
     mode='linear'
 )
 
-raw.plot(block=True)
+# Vizualize the artifact removal
+if show_plots:
+    raw.plot(block=True)
 
 '''
 ##### Filter raw EEG data
@@ -142,25 +156,21 @@ epochs.plot(block = True)
 '''
 epochs.set_eeg_reference('average')
 
-#####
-
-pf.plot_average_epochs_grid(epochs, event_id, tmin=-0.1, tmax=0.35, ymin=-20, ymax=20, n_rows=3, n_cols=3)
-
-######
-
 '''
-##### Plot TEPs before ICA (Temporary)
+##### Plot TEPs before ICA
 '''
-# Plot raw TEPs
-# epochs_beforeICA = epochs.average()
-# pf.plot_evoked_eeg_by_channel_groups(
-#     epochs_beforeICA,
-#     tmin=-0.1, tmax=0.35,
-#     ymin=-20, ymax=20,
-#     ncols=4,
-#     window_highlights=[(0.010, 0.035, 'orange', 0.3)],
-#     split_groups=4
-# )
+if tree_sequence:
+    pf.plot_average_epochs_grid(epochs, event_id, tmin=-0.1, tmax=0.35, ymin=-20, ymax=20, n_rows=3, n_cols=3)
+else:
+    epochs_beforeICA = epochs.average()
+    pf.plot_evoked_eeg_by_channel_groups(
+        epochs_beforeICA,
+        tmin=-0.1, tmax=0.35,
+        ymin=-20, ymax=20,
+        ncols=4,
+        window_highlights=[(0.010, 0.035, 'orange', 0.3)],
+        split_groups=4
+    )
 
 '''
 ##### Remove bad or unused channels 
@@ -221,7 +231,7 @@ for channel_type, ratio in explained_var_ratio.items():
     print(f"Fraction of {channel_type} variance explained by all components: {ratio}")
 
 ##### Remove bad components
-ica.exclude = [0, 1, 2, 5, 7, 16, 18, 19]               # Indices of the bad components can change in each run
+ica.exclude = [0, 1, 2, 13, 16]
 epochs_clean = ica.apply(epochs.copy())
 
 # Plot cleaned epochs
@@ -235,18 +245,18 @@ epochs_clean.plot(block = True)
 ##### (Optional) Second ICA (Infomax)
 '''
 # # Apply ICA (Infomax)
-# ica = mne.preprocessing.ICA(method='infomax', n_components=20, random_state=97)
-# ica.fit(epochs_clean)
+ica = mne.preprocessing.ICA(method='infomax', n_components=20, random_state=97)
+ica.fit(epochs_clean)
 
 # # Plot ICA components
-# ica.plot_sources(epochs_clean, show_scrollbars=False, block=True)
+ica.plot_sources(epochs_clean, show_scrollbars=False, block=True)
 
 # # Remove bad components
-# ica.exclude = [0,3, 10, 16]
-# epochs_clean = ica.apply(epochs_clean.copy())
+ica.exclude = [0, 1]
+epochs_clean = ica.apply(epochs_clean.copy())
 
 # Plot cleaned epochs
-# epochs_clean.plot(block = True)
+epochs_clean.plot(block = True)
 
 '''
 ##### (Optional) SSP
@@ -267,33 +277,27 @@ epochs_clean = epochs_clean.copy().resample(725)
 '''
 ##### Plot average TEPs after ICA
 '''
+if tree_sequence:
+    pf.plot_average_epochs_grid(epochs_clean, event_id, tmin=-0.1, tmax=0.35, ymin=-20, ymax=20, n_rows=3, n_cols=3)
+else:
+    ### Compute average and standard deviation evoked response
+    evoked = epochs_clean.average()
+    std_evoked = epochs_clean.get_data().std(axis=0)
 
-pf.plot_average_epochs_grid(epochs_clean, event_id, tmin=-0.1, tmax=0.35, ymin=-20, ymax=20, n_rows=3, n_cols=3)
+    # # Plot evoked potentials for all EEG channels
+    pf.plot_evoked_eeg_by_channel_groups(
+        evoked,
+        tmin=-0.1, tmax=0.35,
+        ymin=-20, ymax=20,
+        ncols=4,
+        window_highlights=[(0.010, 0.035, 'orange', 0.3)],
+        split_groups=4
+    )
+    ### Plot evoked potential for C3 electrode with standard deviation shading
+    pf.plot_evoked_with_std(epochs_clean, std_evoked, 'C3', tmin=-0.1, tmax=0.35,
+                        highlight_window=(0.015, 0.040))
 
-
-
-
-
-
-# # # Compute average and standard deviation evoked response
-# evoked = epochs_clean.average()
-# std_evoked = epochs_clean.get_data().std(axis=0)
-
-# # Plot evoked potentials for all EEG channels
-# pf.plot_evoked_eeg_by_channel_groups(
-#     evoked,
-#     tmin=-0.1, tmax=0.35,
-#     ymin=-20, ymax=20,
-#     ncols=4,
-#     window_highlights=[(0.010, 0.035, 'orange', 0.3)],
-#     split_groups=4
-# )
-
-# # Plot evoked potential for C3 electrode with standard deviation shading
-# pf.plot_evoked_with_std(epochs_clean, std_evoked, 'C3', tmin=-0.1, tmax=0.35,
-#                      highlight_window=(0.015, 0.040))
-
-#### TO-DO
+#### TO-DO ---------------------------------------------------------------
 # Calculate average TEPs grouping clusters of electrodes for example:
 # C3, FC1, CP1, FC5, CP5, C1, FC3, CP3 and C5
 # C4, FC2, CP2, FC6, CP6, C2, FC4, CP4 and C6

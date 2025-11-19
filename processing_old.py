@@ -44,12 +44,13 @@ Order of steps
 ##### Load data
 '''
 # Construct the relative path to the EDF file and read it
-file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/TEPs_2025.07.08.bdf'             # Pilot 1
+# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/TEPs_2025.07.08.bdf'             # Pilot 1
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Carlo-TEP-120%-2025.07.30.bdf'   # Pilot 2
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/120%rmt.bdf'                       # Pilot 3
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_13-10-25/100_Limiar_50_pulsos.bdf'      # Pilot 4
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_13-10-25/120_Limiar_50_pulsos.bdf'      # Pilot 4
-# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_24-10-25/com_ruido.bdf'
+# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_24-10-25/com_ruido.bdf'                 # Pilot 5
+file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_7-11-25/120MT_50P.bdf'
 
 raw = mne.io.read_raw_bdf(file_path, preload=True)
 
@@ -57,10 +58,10 @@ raw = mne.io.read_raw_bdf(file_path, preload=True)
 print(raw.info)
 print(raw.ch_names)
 
-# raw.plot(block=True, picks=['C3', 'C4'])
+raw.plot(block=True, picks=['C3', 'C4'])
 
 # Adjust channel types
-# raw.set_channel_types({'EMG': 'emg', 'EOG': 'eog'})  # Adjust names for Pilot 1
+raw.set_channel_types({'EMG': 'emg', 'EOG': 'eog'})  # Adjust names for Pilot 1
 # raw.set_channel_types({'emg': 'emg', 'eog': 'eog'})    # Adjust names for Pilot 2 and 3
 
 # raw.plot(block=True, picks=['EMG'])
@@ -86,8 +87,8 @@ mne.preprocessing.fix_stim_artifact(
     raw,
     events=events_from_annot,
     event_id=target_event_id,
-    tmin=-0.002,
-    tmax=0.005,
+    tmin=-0.005,
+    tmax=0.010,
     mode='linear'
 )
 
@@ -110,7 +111,7 @@ freqs = (60, 120, 180, 240, 300)
 filt_eeg_data = filt_eeg_data.notch_filter(freqs=freqs, picks=raw.ch_names)
 
 # Plot PSD 
-# filt_eeg_data.plot_psd(fmax=500)
+filt_eeg_data.plot_psd(fmax=500)
 
 '''
 ##### Create epochs

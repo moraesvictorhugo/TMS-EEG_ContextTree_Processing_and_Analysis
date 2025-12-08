@@ -58,7 +58,8 @@ path_tree_sequence = ''
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_13-10-25/100_Limiar_50_pulsos.bdf'      # Pilot 4
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_13-10-25/120_Limiar_50_pulsos.bdf'      # Pilot 4
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_24-10-25/com_ruido.bdf'                 # Pilot 5
-file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_7-11-25/120MT_50P.bdf'                    # Pilot 6
+# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/12_03_2025_Debora/alvo5.bdf'  
+file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/11_07_2025_VictorMalheiro/120MT_50P.bdf'                  # Pilot 6
 
 raw = mne.io.read_raw_bdf(file_path, preload=True)
 
@@ -78,8 +79,7 @@ raw.set_channel_types({'EMG': 'emg', 'EOG': 'eog'})  # Adjust names for Pilot 1
 # raw.set_channel_types({'emg': 'emg', 'eog': 'eog'})    # Adjust names for Pilot 2 and 3
 
 # Drop non EEG channels
-bad_ch =['P1', 'F2', 'F1', 'T8', 'TP8', 'TP7', 'TP9', 'PO8', 'PO7', 'FT8', 'FT7', 'P6', 'AF7', 'F5', 'F6', 'F8', 'C5', 'C6', 'FC4', 
-                'FC6', 'CP4', 'PO3', 'PO4', 'CP3', 'POz', 'AF8', 'C1', 'FC3', 'Oz', 'CPz', 'AF4', 'AF3', 'P5', 'Fpz', 'P2', 'C2']
+bad_ch =['Iz']
 raw.drop_channels(bad_ch)    
 raw.drop_channels(['EMG', 'EOG'])  
 
@@ -111,8 +111,8 @@ mne.preprocessing.fix_stim_artifact(
     raw,
     events=events_from_annot,
     event_id=event_id,
-    tmin=-0.010,
-    tmax=0.010,
+    tmin=-0.005,
+    tmax=0.008,
     mode='linear'
 )
 
@@ -231,7 +231,7 @@ for channel_type, ratio in explained_var_ratio.items():
     print(f"Fraction of {channel_type} variance explained by all components: {ratio}")
 
 ##### Remove bad components
-ica.exclude = [0, 1, 2, 13, 16]
+ica.exclude = [0]
 epochs_clean = ica.apply(epochs.copy())
 
 # Plot cleaned epochs
@@ -245,18 +245,18 @@ epochs_clean.plot(block = True)
 ##### (Optional) Second ICA (Infomax)
 '''
 # # Apply ICA (Infomax)
-ica = mne.preprocessing.ICA(method='infomax', n_components=20, random_state=97)
-ica.fit(epochs_clean)
+# ica = mne.preprocessing.ICA(method='infomax', n_components=20, random_state=97)
+# ica.fit(epochs_clean)
 
-# # Plot ICA components
-ica.plot_sources(epochs_clean, show_scrollbars=False, block=True)
+# # # Plot ICA components
+# ica.plot_sources(epochs_clean, show_scrollbars=False, block=True)
 
-# # Remove bad components
-ica.exclude = [0, 1]
-epochs_clean = ica.apply(epochs_clean.copy())
+# # # Remove bad components
+# ica.exclude = [0, 1]
+# epochs_clean = ica.apply(epochs_clean.copy())
 
-# Plot cleaned epochs
-epochs_clean.plot(block = True)
+# # Plot cleaned epochs
+# epochs_clean.plot(block = True)
 
 '''
 ##### (Optional) SSP

@@ -15,8 +15,8 @@ import pandas as pd
 import seaborn as sns
 from mne.preprocessing import ICA
 from mne_icalabel import label_components
-from modules import plot_functions as pf
-from modules import processing_functions as pcf
+from src.modules import plot_functions as pf
+from src.modules import processing_functions as pcf
 
 '''
 Order of steps
@@ -53,13 +53,13 @@ path_tree_sequence = ''
 '''
 # Construct the relative path to the EDF file and read it
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/TEPs_2025.07.08.bdf'                           # Pilot 1
-# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Carlo-TEP-120%-2025.07.30.bdf'                 # Pilot 2
+# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Carlo-TEP-100%-2025.07.30.bdf'                 # Pilot 2
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/120%rmt.bdf'                                   # Pilot 3
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_13-10-25/100_Limiar_50_pulsos.bdf'      # Pilot 4
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_13-10-25/120_Limiar_50_pulsos.bdf'      # Pilot 4
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_24-10-25/com_ruido.bdf'                 # Pilot 5
-# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/12_03_2025_Debora/alvo5.bdf'  
-file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/11_07_2025_VictorMalheiro/120MT_50P.bdf'                  # Pilot 6
+file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/12_03_2025_Debora/alvo5.bdf'  
+# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/11_07_2025_VictorMalheiro/120MT_50P.bdf'       # Pilot 6
 
 raw = mne.io.read_raw_bdf(file_path, preload=True)
 
@@ -78,7 +78,7 @@ if show_plots:
 raw.set_channel_types({'EMG': 'emg', 'EOG': 'eog'})  # Adjust names for Pilot 1
 # raw.set_channel_types({'emg': 'emg', 'eog': 'eog'})    # Adjust names for Pilot 2 and 3
 
-# Drop non EEG channels
+# Drop non EEG channels and bad channels
 bad_ch =['Iz']
 raw.drop_channels(bad_ch)    
 raw.drop_channels(['EMG', 'EOG'])  
@@ -231,7 +231,7 @@ for channel_type, ratio in explained_var_ratio.items():
     print(f"Fraction of {channel_type} variance explained by all components: {ratio}")
 
 ##### Remove bad components
-ica.exclude = [0]
+ica.exclude = [0, 1]
 epochs_clean = ica.apply(epochs.copy())
 
 # Plot cleaned epochs

@@ -52,13 +52,13 @@ path_tree_sequence = ''
 ##### Load data
 '''
 # Construct the relative path to the EDF file and read it
-# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/TEPs_2025.07.08.bdf'                           # Pilot 1
+file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/TEPs_2025.07.08.bdf'                           # Pilot 1
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Carlo-TEP-120%-2025.07.30.bdf'                 # Pilot 2
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/120%rmt.bdf'                                   # Pilot 3
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_13-10-25/100_Limiar_50_pulsos.bdf'      # Pilot 4
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_13-10-25/120_Limiar_50_pulsos.bdf'      # Pilot 4
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_24-10-25/com_ruido.bdf'                 # Pilot 5
-file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_7-11-25/120MT_50P.bdf'                    # Pilot 6
+# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_7-11-25/120MT_50P.bdf'                    # Pilot 6
 
 raw = mne.io.read_raw_bdf(file_path, preload=True)
 
@@ -112,7 +112,7 @@ mne.preprocessing.fix_stim_artifact(
     events=events_from_annot,
     event_id=event_id,
     tmin=-0.010,
-    tmax=0.010,
+    tmax=0.008,
     mode='linear'
 )
 
@@ -231,7 +231,7 @@ for channel_type, ratio in explained_var_ratio.items():
     print(f"Fraction of {channel_type} variance explained by all components: {ratio}")
 
 ##### Remove bad components
-ica.exclude = [0, 1, 2, 13, 16]
+ica.exclude = [0, 9, 16, 19]
 epochs_clean = ica.apply(epochs.copy())
 
 # Plot cleaned epochs
@@ -302,6 +302,32 @@ else:
 # C3, FC1, CP1, FC5, CP5, C1, FC3, CP3 and C5
 # C4, FC2, CP2, FC6, CP6, C2, FC4, CP4 and C6
 # This approach can potentially increase signal-to-noise ratio
+
+# Assume epochs_clean is your MNE Epochs object (post-preprocessing)
+motor_channels = ['C3', 'FC5', 'FC1', 'CP1', 'CP5']  # Adjust based on your montage
+picks = mne.pick_channels(epochs_clean.ch_names, include=motor_channels)
+
+# Extract data: (n_epochs, n_channels, n_times)
+data = epochs_clean.get_data(picks=picks)  # Shape: (epochs, 5, times)
+
+# Compute LMFA: sqrt(mean(V_i(t)^2 across channels)) for each epoch and time point
+lmfa = np.sqrt(np.mean(data**2, axis=1))  # Shape: (epochs, times)
+
+# Average across epochs for evoked LMFA
+lmfa_evoked = np.mean(lmfa, axis=0)  # Shape: (times,)
+
+# Plot evoked LMFA
+plt.figure(figsize=(10, 4))
+plt.plot(epochs_clean.times * 1000, lmfa_evoked, linewidth=2, color='blue')
+plt.axvline(0, color='red', linestyle='--', alpha=0.7, label='TMS pulse')
+plt.xlabel('Time (ms)')
+plt.ylabel('LMFA (µV)')
+plt.title('Local Mean Field Amplitude - Motor Cortex Cluster')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.show()
+
 
 '''
 ##### Calculate peak to peak amplitudes

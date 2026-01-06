@@ -41,47 +41,34 @@ Order of steps
 '''
 
 '''
-##### Setting Flags
-'''
-show_plots = True
-export_data = False
-tree_sequence = False
-path_tree_sequence = ''
-
-'''
 ##### Load data
 '''
 # Construct the relative path to the EDF file and read it
-file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/TEPs_2025.07.08.bdf'                           # Pilot 1
-# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Carlo-TEP-120%-2025.07.30.bdf'                 # Pilot 2
-# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/120%rmt.bdf'                                   # Pilot 3
+# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/TEPs_2025.07.08.bdf'             # Pilot 1
+# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Carlo-TEP-120%-2025.07.30.bdf'   # Pilot 2
+# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/120%rmt.bdf'                       # Pilot 3
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_13-10-25/100_Limiar_50_pulsos.bdf'      # Pilot 4
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_13-10-25/120_Limiar_50_pulsos.bdf'      # Pilot 4
 # file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_24-10-25/com_ruido.bdf'                 # Pilot 5
-# file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_7-11-25/120MT_50P.bdf'                    # Pilot 6
+file_path = '/home/victormoraes/MEGA/Archive/PD FFCLRP-USP/data_PD_Neuromat/Piloto_7-11-25/120MT_50P.bdf'
 
 raw = mne.io.read_raw_bdf(file_path, preload=True)
-
-# Load txt file with event codes into a numpy array
-if tree_sequence:
-    event_codes = np.loadtxt(path_tree_sequence, dtype=int)
 
 # Get metadata and channel names
 print(raw.info)
 print(raw.ch_names)
 
-if show_plots:
-    raw.plot(block=True)
+raw.plot(block=True, picks=['C3', 'C4'])
 
 # Adjust channel types
 raw.set_channel_types({'EMG': 'emg', 'EOG': 'eog'})  # Adjust names for Pilot 1
 # raw.set_channel_types({'emg': 'emg', 'eog': 'eog'})    # Adjust names for Pilot 2 and 3
 
+# raw.plot(block=True, picks=['EMG'])
+
 # Drop non EEG channels
-bad_ch =['P1', 'F2', 'F1', 'T8', 'TP8', 'TP7', 'TP9', 'PO8', 'PO7', 'FT8', 'FT7', 'P6', 'AF7', 'F5', 'F6', 'F8', 'C5', 'C6', 'FC4', 
-                'FC6', 'CP4', 'PO3', 'PO4', 'CP3', 'POz', 'AF8', 'C1', 'FC3', 'Oz', 'CPz', 'AF4', 'AF3', 'P5', 'Fpz', 'P2', 'C2']
-raw.drop_channels(bad_ch)    
-raw.drop_channels(['EMG', 'EOG'])  
+raw.drop_channels(['EMG', 'EOG'])    # For Pilot 1
+# raw.drop_channels(['emg', 'eog'])  # For Pilot 2 and 3
 
 '''
 ##### Find and create events
@@ -89,19 +76,8 @@ raw.drop_channels(['EMG', 'EOG'])
 # Get events from annotations
 events_from_annot, event_dict = mne.events_from_annotations(raw)
 
-# Replace the event code in the third column of events_from_annot
-if tree_sequence:
-    events_from_annot[:, 2] = event_codes
-
-# Define the event IDs
-if tree_sequence:
-    event_id = {
-        'stimulus_0': 0,
-        'stimulus_1': 1,
-        'stimulus_2': 2
-    }
-else:
-    event_id = event_dict['Stimulus A']
+# Select the event of interest
+target_event_id = event_dict['Stimulus A']  # replace with actual label from event_dict keys
 
 '''
 ##### Remove TMS artifact using baseline data
@@ -110,15 +86,13 @@ else:
 mne.preprocessing.fix_stim_artifact(
     raw,
     events=events_from_annot,
-    event_id=event_id,
-    tmin=-0.010,
-    tmax=0.008,
+    event_id=target_event_id,
+    tmin=-0.005,
+    tmax=0.010,
     mode='linear'
 )
 
-# Vizualize the artifact removal
-if show_plots:
-    raw.plot(block=True)
+raw.plot(block=True)
 
 '''
 ##### Filter raw EEG data
@@ -139,17 +113,14 @@ filt_eeg_data = filt_eeg_data.notch_filter(freqs=freqs, picks=raw.ch_names)
 # Plot PSD 
 filt_eeg_data.plot_psd(fmax=500)
 
-# Plot filtered data
-filt_eeg_data.plot(block=True)
-
 '''
 ##### Create epochs
 '''
 # Create epochs
-epochs = mne.Epochs(filt_eeg_data, events_from_annot, event_id, tmin=-0.8, tmax=0.8, preload=True)
+epochs = mne.Epochs(filt_eeg_data, events_from_annot, event_dict, tmin=-0.8, tmax=0.8, preload=True)
 
 # Plot epochs
-epochs.plot(block = True)
+# epochs.plot(block = True)
 
 '''
 ##### Average reference
@@ -157,20 +128,18 @@ epochs.plot(block = True)
 epochs.set_eeg_reference('average')
 
 '''
-##### Plot TEPs before ICA
+##### Plot TEPs before ICA (Temporary)
 '''
-if tree_sequence:
-    pf.plot_average_epochs_grid(epochs, event_id, tmin=-0.1, tmax=0.35, ymin=-20, ymax=20, n_rows=3, n_cols=3)
-else:
-    epochs_beforeICA = epochs.average()
-    pf.plot_evoked_eeg_by_channel_groups(
-        epochs_beforeICA,
-        tmin=-0.1, tmax=0.35,
-        ymin=-20, ymax=20,
-        ncols=4,
-        window_highlights=[(0.010, 0.035, 'orange', 0.3)],
-        split_groups=4
-    )
+# Plot raw TEPs
+epochs_beforeICA = epochs.average()
+# pf.plot_evoked_eeg_by_channel_groups(
+#     epochs_beforeICA,
+#     tmin=-0.1, tmax=0.35,
+#     ymin=-20, ymax=20,
+#     ncols=4,
+#     window_highlights=[(0.010, 0.035, 'orange', 0.3)],
+#     split_groups=4
+# )
 
 '''
 ##### Remove bad or unused channels 
@@ -231,11 +200,34 @@ for channel_type, ratio in explained_var_ratio.items():
     print(f"Fraction of {channel_type} variance explained by all components: {ratio}")
 
 ##### Remove bad components
-ica.exclude = [0, 9, 16, 19]
+ica.exclude = [0, 1, 10, 11, 18]               # Indices of the bad components can change in each run
 epochs_clean = ica.apply(epochs.copy())
 
 # Plot cleaned epochs
-epochs_clean.plot(block = True)
+# epochs_clean.plot(block = True)
+
+### -----------------------
+# # Plot morlet waveform for all channels
+# # Define frequencies of interest
+# frequencies = np.arange(8, 45, 1)  # from 7 to 30 Hz in steps of 3
+
+# # Number of cycles in Morlet wavelet; can be float or array matching freqs size
+# n_cycles = 7  
+
+# # Compute time-frequency representation using Morlet wavelets
+# power = epochs_clean.compute_tfr(
+#     method='morlet',
+#     freqs=frequencies,
+#     n_cycles=n_cycles,
+#     use_fft=True,
+#     return_itc=False,  # whether to return inter-trial coherence
+#     decim=3,           # decimate time axis to speed up computation
+#     average=False      # set to False to keep single trials, True to average
+# )
+
+# # Plot power for a specific channel (e.g., first channel)
+# power.plot(picks=[0], title='Time-Frequency Power - Electrode 1')
+### ------------------------
 
 '''
 ##### (Optional and very experimental) PARAFAC decomposition
@@ -245,18 +237,18 @@ epochs_clean.plot(block = True)
 ##### (Optional) Second ICA (Infomax)
 '''
 # # Apply ICA (Infomax)
-ica = mne.preprocessing.ICA(method='infomax', n_components=20, random_state=97)
-ica.fit(epochs_clean)
+# ica = mne.preprocessing.ICA(method='infomax', n_components=20, random_state=97)
+# ica.fit(epochs_clean)
 
 # # Plot ICA components
-ica.plot_sources(epochs_clean, show_scrollbars=False, block=True)
+# ica.plot_sources(epochs_clean, show_scrollbars=False, block=True)
 
 # # Remove bad components
-ica.exclude = [0, 1]
-epochs_clean = ica.apply(epochs_clean.copy())
+# ica.exclude = [0,3, 10, 16]
+# epochs_clean = ica.apply(epochs_clean.copy())
 
 # Plot cleaned epochs
-epochs_clean.plot(block = True)
+# epochs_clean.plot(block = True)
 
 '''
 ##### (Optional) SSP
@@ -277,69 +269,38 @@ epochs_clean = epochs_clean.copy().resample(725)
 '''
 ##### Plot average TEPs after ICA
 '''
-if tree_sequence:
-    pf.plot_average_epochs_grid(epochs_clean, event_id, tmin=-0.1, tmax=0.35, ymin=-20, ymax=20, n_rows=3, n_cols=3)
-else:
-    ### Compute average and standard deviation evoked response
-    evoked = epochs_clean.average()
-    std_evoked = epochs_clean.get_data().std(axis=0)
+# # Compute average and standard deviation evoked response
+evoked = epochs_clean.average()
+std_evoked = epochs_clean.get_data().std(axis=0)
 
-    # # Plot evoked potentials for all EEG channels
-    pf.plot_evoked_eeg_by_channel_groups(
-        evoked,
-        tmin=-0.1, tmax=0.35,
-        ymin=-20, ymax=20,
-        ncols=4,
-        window_highlights=[(0.010, 0.035, 'orange', 0.3)],
-        split_groups=4
-    )
-    ### Plot evoked potential for C3 electrode with standard deviation shading
-    pf.plot_evoked_with_std(epochs_clean, std_evoked, 'C3', tmin=-0.1, tmax=0.35,
-                        highlight_window=(0.015, 0.040))
+# Plot evoked potentials for all EEG channels
+# pf.plot_evoked_eeg_by_channel_groups(
+#     evoked,
+#     tmin=-0.1, tmax=0.35,
+#     ymin=-20, ymax=20,
+#     ncols=4,
+#     window_highlights=[(0.010, 0.035, 'orange', 0.3)],
+#     split_groups=4
+# )
 
-#### TO-DO ---------------------------------------------------------------
-# Calculate average TEPs grouping clusters of electrodes for example:
-# C3, FC1, CP1, FC5, CP5, C1, FC3, CP3 and C5
-# C4, FC2, CP2, FC6, CP6, C2, FC4, CP4 and C6
-# This approach can potentially increase signal-to-noise ratio
-
-# Assume epochs_clean is your MNE Epochs object (post-preprocessing)
-motor_channels = ['C3', 'FC5', 'FC1', 'CP1', 'CP5']  # Adjust based on your montage
-picks = mne.pick_channels(epochs_clean.ch_names, include=motor_channels)
-
-# Extract data: (n_epochs, n_channels, n_times)
-data = epochs_clean.get_data(picks=picks)  # Shape: (epochs, 5, times)
-
-# Compute LMFA: sqrt(mean(V_i(t)^2 across channels)) for each epoch and time point
-lmfa = np.sqrt(np.mean(data**2, axis=1))  # Shape: (epochs, times)
-
-# Average across epochs for evoked LMFA
-lmfa_evoked = np.mean(lmfa, axis=0)  # Shape: (times,)
-
-# Plot evoked LMFA
-plt.figure(figsize=(10, 4))
-plt.plot(epochs_clean.times * 1000, lmfa_evoked, linewidth=2, color='blue')
-plt.axvline(0, color='red', linestyle='--', alpha=0.7, label='TMS pulse')
-plt.xlabel('Time (ms)')
-plt.ylabel('LMFA (µV)')
-plt.title('Local Mean Field Amplitude - Motor Cortex Cluster')
-plt.legend()
-plt.grid(True, alpha=0.3)
-plt.tight_layout()
-plt.show()
-
+# # Plot evoked potential for C3 electrode with standard deviation shading
+# pf.plot_evoked_with_std(epochs_clean, std_evoked, 'C3', tmin=-0.1, tmax=0.35,
+#                      highlight_window=(0.015, 0.040))
 
 '''
 ##### Calculate peak to peak amplitudes
 '''
 # # Calculate peak to peak amplitudes evoked response in C3 electrode and convert to uV
-ptp_value = pcf.peak_to_peak_amplitude_evoked(evoked, channel_name='C3', tmin=0.01, tmax=0.040)
+ptp_value, ptp_std = pcf.peak_to_peak_amplitude_evoked(evoked, channel_name='C3', tmin=0.01, tmax=0.040)
 ptp_value = ptp_value * 1e6
+ptp_std = ptp_std * 1e6
 print(f"Peak-to-peak amplitude after averaging (uV): {ptp_value}")
+print(f"Peak-to-peak amplitude standard deviation (uV): {ptp_std}")
 
 '''
 ##### Phase synchrony analysis
 '''
+
 from mne_connectivity import spectral_connectivity_epochs
 import numpy as np
 
@@ -374,11 +335,29 @@ print("\nPhase Locking Value (PLV) between C3 and other electrodes (alpha band, 
 for ch_idx, ch_name in enumerate(epochs_sync.ch_names):
     print(f'{seed_electrode} <-> {ch_name}: {con.get_data()[ch_idx, 0]:.3f}')
 
+
 '''
 ##### Time-frequency analysis  --- needs to be finished!
 '''    
 # Time-frequency analysis of TMS-evoked potentials using Morlet wavelets
-frequencies = np.arange(1, 45, 3)  # frequencies from 7 to 30 Hz, step 3 Hz
+frequencies = np.arange(8, 45, 1)  # frequencies from 7 to 30 Hz, step 3 Hz
+n_cycles = frequencies / 2.0  # number of cycles per frequency
+
+# Define baseline period, for example from -0.2 to 0 seconds relative to event onset
+baseline = (-0.6, -0.1)
+
+# Compute induced power using Morlet wavelets, average across trials
+power = epochs_clean.compute_tfr('morlet', freqs=frequencies, n_cycles=n_cycles,
+                           use_fft=True, return_itc=False, decim=3, average=True)
+
+# Optionally baseline correct power (e.g., using -0.2 to 0 seconds pre-stimulus)
+# power.apply_baseline(baseline=(-0.600, -0.100), mode='logratio')
+
+# Plot time-frequency power for all channels
+for ch_name in power.ch_names:
+    power.plot(picks=[ch_name], title=f'Time-Frequency Power (Morlet) - Channel: {ch_name}')
+    plt.show()  # Ensure each plot is displayed separately# Time-frequency analysis of TMS-evoked potentials using Morlet wavelets
+frequencies = np.arange(8, 45, 1)  # frequencies from 7 to 30 Hz, step 3 Hz
 n_cycles = frequencies / 2.0  # number of cycles per frequency
 
 # Compute induced power using Morlet wavelets, average across trials
@@ -386,7 +365,11 @@ power = epochs_clean.compute_tfr('morlet', freqs=frequencies, n_cycles=n_cycles,
                            use_fft=True, return_itc=False, decim=3, average=True)
 
 # Optionally baseline correct power (e.g., using -0.2 to 0 seconds pre-stimulus)
-power.apply_baseline(baseline=(-0.1, 0), mode='logratio')
+power.apply_baseline(baseline=(-0.600, -0.100), mode='logratio')
+
+# # Plot time-frequency power for the first channel, showing from -0.2 to 0.5 seconds
+# power.plot(picks=['C3'], tmin=-0.2, tmax=0.2, title='Time-Frequency Power - Electrode 1')
+
 
 # Plot time-frequency power for all channels
 for ch_name in power.ch_names:

@@ -1,72 +1,77 @@
 /*
-  Arduino trigger generator for NeurOne EEG
-  - Receives an integer (1–7) via Serial
-  - Outputs a 3-bit binary code on digital pins
-  - Pulse duration: 5 ms
+  ESP32 Trigger Generator para NeurOne EEG
+  - Recebe números 1–15 via Serial
+  - Gera código binário de 4 bits nos pinos BIT0–BIT3
+  - Pulso de 30 ms
+  - Buffer serial limpo para evitar duplicação
 */
 
 // ================= CONFIGURAÇÃO =================
 
-// 3 pinos digitais do Arduino (2, 3 e 4) como bits binários para os pinos IN1, 2 e 3 do NeurOne
-const int BIT0_PIN = 2;  // -> IN1
-const int BIT1_PIN = 3;  // -> IN2
-const int BIT2_PIN = 4;  // -> IN3
+// Pinos digitais para os 4 bits
+const int BIT0_PIN = 26; // IN1
+const int BIT1_PIN = 25; // IN2
+const int BIT2_PIN = 33; // IN3
+const int BIT3_PIN = 32; // IN4
 
-// Duração do pulso em milissegundos
-const unsigned long PULSE_DURATION_MS = 5;
+// Pulso em milissegundos
+const unsigned long PULSE_DURATION_MS = 30;
 
-// ================= SETUP =================
 void setup() {
-  // Configura os pinos digitais do arduino como saída
+  // Configura pinos como saída
   pinMode(BIT0_PIN, OUTPUT);
   pinMode(BIT1_PIN, OUTPUT);
   pinMode(BIT2_PIN, OUTPUT);
+  pinMode(BIT3_PIN, OUTPUT);
 
-  // Garante que tudo começa em LOW
+  // Começa com todos LOW
   clearBits();
 
-  // Inicializa comunicação serial a uma taxa de transmissão (baud rate) em bits/seg
-  Serial.begin(115200); // velocidade padrão -> setar no script py
+  Serial.begin(115200);
+  Serial.println("ESP32 pronto para receber triggers 1-15");
 }
 
-// ================= LOOP PRINCIPAL =================
 void loop() {
-  // Verifica se chegou algum dado pela serial
   if (Serial.available() > 0) {
+    // Lê trigger do Python
+    byte triggerValue = Serial.parseInt();
 
-    // Lê um número inteiro (ex: "3\n")
-    int triggerValue = Serial.parseInt();
+    // Limpa todo o buffer serial
+    while (Serial.available() > 0) Serial.read();
 
-    // Limpa buffer serial
-    Serial.read();
+    // Validação de 1 a 15
+    if (triggerValue >= 1 && triggerValue <= 15) {
+      // DEBUG: mostra no monitor serial
+      Serial.print("Recebido trigger: ");
+      Serial.println(triggerValue);
 
-    // Validação básica
-    if (triggerValue >= 1 && triggerValue <= 7) {
       sendTrigger(triggerValue);
     }
   }
 }
 
 // ================= FUNÇÕES =================
-
-// Coloca todos os bits em LOW
 void clearBits() {
   digitalWrite(BIT0_PIN, LOW);
   digitalWrite(BIT1_PIN, LOW);
   digitalWrite(BIT2_PIN, LOW);
+  digitalWrite(BIT3_PIN, LOW);
 }
 
-// Envia trigger binário
-void sendTrigger(int value) {
+void sendTrigger(byte value) {
+  // Monta os 4 bits
+  digitalWrite(BIT0_PIN, (value & 0b0001) ? HIGH : LOW);
+  digitalWrite(BIT1_PIN, (value & 0b0010) ? HIGH : LOW);
+  digitalWrite(BIT2_PIN, (value & 0b0100) ? HIGH : LOW);
+  digitalWrite(BIT3_PIN, (value & 0b1000) ? HIGH : LOW);
 
-  // === Monta os bits (simultaneamente) ===
-  digitalWrite(BIT0_PIN, value & 0b001 ? HIGH : LOW);
-  digitalWrite(BIT1_PIN, value & 0b010 ? HIGH : LOW);
-  digitalWrite(BIT2_PIN, value & 0b100 ? HIGH : LOW);
+  // DEBUG: envia linha com os bits em binário
+  Serial.print("Bits enviados: ");
+  Serial.print((value & 0b1000) ? 1 : 0); // BIT3 (MSB)
+  Serial.print((value & 0b0100) ? 1 : 0); // BIT2
+  Serial.print((value & 0b0010) ? 1 : 0); // BIT1
+  Serial.println((value & 0b0001) ? 1 : 0); // BIT0 (LSB)
 
-  // Mantém o estado por 5 ms
   delay(PULSE_DURATION_MS);
-
-  // Retorna tudo para LOW
   clearBits();
 }

@@ -40,7 +40,7 @@ Steps
 """
 ##############################################################################
 # Settings
-config = ProjectConfig(subject_id="V06")
+config = ProjectConfig(subject_id="V00")
 
 # Load data
 raw_data = load_data(config)
@@ -101,8 +101,8 @@ epochs_eeg.plot()
 epochs_eeg.interpolate_bads(reset_bads=True)
 
 # Remove bad trials using pre-identified epoch indices from JSON
-epochs_eeg = EpochDropper(config).drop_from_json(epochs_eeg,
-    "data/idx_epochs_rem_1st_run.json")
+# epochs_eeg = EpochDropper(config).drop_from_json(epochs_eeg,
+#     "data/idx_epochs_rem_1st_run.json")
 
 # Linear Detrend in each epoch and channel
 epochs_eeg.apply_function(lambda x: detrend(x, type='linear'), picks='all')

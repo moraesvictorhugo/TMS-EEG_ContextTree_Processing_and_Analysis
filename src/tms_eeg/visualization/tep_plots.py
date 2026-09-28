@@ -5,6 +5,8 @@ from typing import List, Optional, Dict
 import numpy as np
 import matplotlib.pyplot as plt
 
+from tms_eeg.io.writer import save_figure
+
 class TEPPlotter:
     """Plots TEP-related visualizations from epochs or evoked objects."""
 
@@ -33,15 +35,7 @@ class TEPPlotter:
 
     def _save_figure(self, fig, name: str, condition: str):
         """Save figure if save_figs is enabled in config."""
-        if self.config and self.config.io.save_figs and fig is not None:
-            if self.writer:
-                writer = self.writer
-            else:
-                from tms_eeg.io.writer import Writer
-                writer = Writer(self.config)
-            
-            filename = f"tep_{name}_{condition}"
-            writer.save_figure(fig, filename)
+        save_figure(self.config, fig, f"tep_{name}_{condition}", self.writer)
 
     def plot_evoked_by_symbol(
         self,
@@ -70,7 +64,7 @@ class TEPPlotter:
         picks = picks or self.roi_picks
         xlim_ms = tuple(v * 1e3 for v in (xlim or self.xlim))
 
-        event_to_symbol = self.config.analysis.event_to_symbol  # {1: 0, 2: 1, 3: 2}
+        event_to_symbol = self.config.events.event_to_symbol  # {1: 0, 2: 1, 3: 2}
 
         # Mapa inverso: event_id -> nome da condição (apenas dos eids relevantes)
         eid_to_cond = {v: k for k, v in epochs.event_id.items()}

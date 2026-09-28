@@ -1,71 +1,53 @@
 import mne
 import numpy as np
-from typing import Union
 from scipy.interpolate import CubicSpline
 
-from src.tms_eeg.config.settings import ProjectConfig
+from tms_eeg.config.settings import ProjectConfig
 
 
 class ArtifactRemover:
-    MNE_MODES = {"linear", "window", "constant"}
-    CUSTOM_MODES = {"cubic"}
+    """Remove the TMS pulse artifact from epoched data."""
 
     def __init__(self, config: ProjectConfig):
         self.config = config
 
     def remove_tms_artifact(
         self,
-        inst: Union[mne.io.BaseRaw, mne.BaseEpochs],
+        epochs: mne.BaseEpochs,
         mode: str | None = None,
-    ) -> Union[mne.io.BaseRaw, mne.BaseEpochs]:
+    ) -> mne.BaseEpochs:
+        """Cubic-spline interpolation over the artifact window.
 
-        artifact_cfg = self.config.artifact
-        window = artifact_cfg.window_removal_artifact
-        mode = mode or artifact_cfg.mode_removal_artifact
+        The interpolation is anchored on the samples immediately before and
+        after the artifact window (see ``ArtifactConfig.anchor_window_ms``).
 
-        if mode in self.MNE_MODES:
-            return self._remove_with_mne(inst, window, mode)
+        Parameters
+        ----------
+        epochs : mne.BaseEpochs
+            Epoched EEG data.
+        mode : str, optional
+            Interpolation mode. Only ``"cubic"`` is supported.
+        """
+        mode = mode or self.config.artifact.mode_removal_artifact
+        if mode != "cubic":
+            raise ValueError(f"Only mode='cubic' is supported, got {mode!r}")
+        return self._interpolate_cubic(epochs, self.config.artifact.window_removal_artifact)
 
-        elif mode in self.CUSTOM_MODES:
-            if not isinstance(inst, mne.BaseEpochs):
-                raise TypeError(
-                    f"Mode '{mode}' is only supported for Epochs, "
-                    f"got {type(inst).__name__}."
-                )
-            return self._interpolate_cubic(inst, window)
+    def fix_stim_artifact(self, inst: mne.BaseEpochs) -> mne.BaseEpochs:
+        """Constant-interpolation pass run after SSP-SIR (mne-native).
 
-        else:
-            allowed = self.MNE_MODES | self.CUSTOM_MODES
-            raise ValueError(
-                f"Unsupported mode '{mode}'. Choose from {sorted(allowed)}."
-            )
+        Uses the same artifact window as the main removal step, with the
+        ``fix_stim_artifact_baseline`` period from the config.
+        """
+        cfg = self.config.artifact
+        return mne.preprocessing.fix_stim_artifact(
+            inst.copy(),
+            mode="constant",
+            tmin=cfg.window_removal_artifact[0],
+            tmax=cfg.window_removal_artifact[1],
+            baseline=cfg.fix_stim_artifact_baseline,
+        )
 
-    # ------------------------------------------------------------------ #
-    # MNE-native modes (linear / window / constant)
-    # ------------------------------------------------------------------ #
-    def _remove_with_mne(
-        self,
-        inst: Union[mne.io.BaseRaw, mne.BaseEpochs],
-        window: tuple,
-        mode: str,
-    ) -> Union[mne.io.BaseRaw, mne.BaseEpochs]:
-        inst_clean = inst.copy().load_data()
-        kwargs = dict(tmin=window[0], tmax=window[1], mode=mode)
-
-        if isinstance(inst, mne.io.BaseRaw):
-            events, event_id = mne.events_from_annotations(inst)
-            tms_annotation = list(self.config.events.trigger_id.keys())[0]
-            kwargs["events"] = events
-            kwargs["event_id"] = event_id[tms_annotation]
-        elif not isinstance(inst, mne.BaseEpochs):
-            raise TypeError(f"Unsupported type: {type(inst)}")
-
-        mne.preprocessing.fix_stim_artifact(inst_clean, **kwargs)
-        return inst_clean
-
-    # ------------------------------------------------------------------ #
-    # Custom cubic spline interpolation — only for Epochs
-    # ------------------------------------------------------------------ #
     def _interpolate_cubic(
         self,
         epochs: mne.BaseEpochs,
@@ -78,8 +60,7 @@ class ArtifactRemover:
 
         # anchor window in seconds (ms -> s)
         anchor_ms = self.config.artifact.anchor_window_ms
-        anchor_sec = anchor_ms / 1000.0
-        n_anchor = int(round(anchor_sec * sfreq))
+        n_anchor = int(round(anchor_ms / 1000.0 * sfreq))
 
         idx_start = int(np.searchsorted(times, tmin))
         idx_end = int(np.searchsorted(times, tmax))

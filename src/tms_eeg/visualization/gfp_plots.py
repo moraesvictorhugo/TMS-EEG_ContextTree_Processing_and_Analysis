@@ -5,7 +5,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Dict, Optional, List, Tuple
-from pathlib import Path
+
+from tms_eeg.io.writer import save_figure
 
 
 class MFPPlotter:
@@ -157,10 +158,5 @@ class MFPPlotter:
             )
 
     def _save_figure(self, fig, name: str, condition: str):
-        if self.config and self.config.io.save_figs and fig is not None:
-            if self.writer:
-                writer = self.writer
-            else:
-                from src.tms_eeg.io.writer import Writer
-                writer = Writer(self.config)
-            writer.save_figure(fig, f"mfp_{name}_{condition}")
+        """Save figure if save_figs is enabled in config."""
+        save_figure(self.config, fig, f"mfp_{name}_{condition}", self.writer)

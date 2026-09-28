@@ -1,55 +1,64 @@
+""""context.py - maps surviving epochs to context-tree contexts."""
+
 import mne
 import numpy as np
-from typing import Dict, List, Optional
-from src.tms_eeg.config.settings import ProjectConfig
+from typing import Dict, List
+
+from tms_eeg.config.settings import ProjectConfig
+
 
 class ContextMapper:
     """
-    Mapeia épocas sobreviventes a contextos baseados na sequência
-    original de estímulos (árvore de contexto).
+    Maps surviving epochs to contexts based on the original stimulus
+    sequence (context tree).
     """
 
     def __init__(self, config: ProjectConfig):
         self.config = config
-        self.event_to_symbol = config.analysis.event_to_symbol
+        self.event_to_symbol = config.events.event_to_symbol
         self.context_definitions = config.analysis.context_definitions
 
     def get_full_sequence(self, raw_path: str) -> np.ndarray:
         """
-        Carrega o raw, aplica o AnnotationProcessor (mesmo pipeline do
-        pré-processamento) e extrai a sequência completa de símbolos.
+        Extract the full original symbol sequence of a subject.
+
+        The sequence is loaded from the raw file (reproducing the annotation
+        processing of the preprocessing pipeline) and cached next to the
+        processed data, so repeated analysis runs do not re-read the raw.
 
         Parameters
         ----------
         raw_path : str
-            Caminho para o arquivo .bdf/.fif raw.
+            Path to the raw .bdf/.fif file.
 
         Returns
         -------
         symbols : np.ndarray, shape (n_events,)
-            Sequência de símbolos na ordem original.
-        event_indices : np.ndarray, shape (n_events,)
-            Índices posicionais de cada evento.
+            Symbol sequence in the original order.
         """
-        from src.tms_eeg.preprocessing.annotation_processor import AnnotationProcessor
-        from src.tms_eeg.preprocessing.epoching import EEGEpocher
+        cache_path = (
+            self.config.paths.subject_processed_dir(self.config.subject_id)
+            / "stimulus_sequence.npy"
+        )
+        if cache_path.exists():
+            return np.load(cache_path)
+
+        from tms_eeg.preprocessing.annotation_processor import AnnotationProcessor
+        from tms_eeg.preprocessing.epoching import EEGEpocher
 
         raw = mne.io.read_raw(raw_path, preload=False, verbose=False)
 
-        # Reproduz o mesmo processamento de annotations do pipeline
-        processor = AnnotationProcessor(self.config)
-        raw = processor.process_annotations(raw)
+        # Reproduce the same annotation processing as the preprocessing pipeline.
+        raw = AnnotationProcessor(self.config).process_annotations(raw)
 
-        # Usa o mesmo find_events para garantir consistência
-        epocher = EEGEpocher(self.config)
-        events, event_id = epocher.find_events(raw)
+        # Use the same event finding to guarantee consistency.
+        events, _ = EEGEpocher(self.config).find_events(raw)
 
-        symbols = np.array([
-            self.event_to_symbol[code] for code in events[:, 2]
-        ])
+        symbols = np.array([self.event_to_symbol[code] for code in events[:, 2]])
 
-        return symbols, np.arange(len(symbols))
-
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        np.save(cache_path, symbols)
+        return symbols
 
     def classify_epochs(
         self,
@@ -57,22 +66,20 @@ class ContextMapper:
         surviving_indices: np.ndarray,
     ) -> Dict[str, List[int]]:
         """
-        Classifica cada época sobrevivente em contextos.
+        Classify every surviving epoch into contexts.
 
         Parameters
         ----------
         full_sequence : np.ndarray
-            Sequência completa de símbolos (da raw).
+            Complete symbol sequence of the raw file.
         surviving_indices : np.ndarray
-            Índices originais das épocas que sobreviveram
-            (epochs.selection).
+            Original indices of the surviving epochs (``epochs.selection``).
 
         Returns
         -------
         context_map : dict
-            {context_name: [índices dentro do epochs sobrevivente]}
-            Os índices são posições no objeto epochs (0, 1, 2, ...),
-            NÃO os índices originais.
+            ``{context_name: [positions in the surviving Epochs object]}``
+            (positions, not original indices).
         """
         context_map = {name: [] for name in self.context_definitions}
 
@@ -83,36 +90,27 @@ class ContextMapper:
                 depth = len(pattern)
 
                 if depth == 1:
-                    # Contexto sem história — basta o símbolo atual
+                    # No-history context: current symbol alone determines it.
                     if symbol_atual == pattern[0]:
                         context_map[ctx_name].append(epoch_pos)
 
                 elif depth >= 2:
-                    # Precisa verificar os símbolos anteriores na
-                    # sequência ORIGINAL (sem gaps)
+                    # History contexts need the previous symbols on the
+                    # ORIGINAL sequence (no gaps from removed epochs).
                     if orig_idx < depth - 1:
-                        continue  # não tem história suficiente
+                        continue  # not enough history
 
-                    # Checa se os anteriores são consecutivos na
-                    # sequência original (sem remoção entre eles)
                     history_indices = list(
                         range(orig_idx - (depth - 1), orig_idx + 1)
                     )
-
-                    # Extrai o padrão da sequência original
-                    actual_pattern = [
-                        full_sequence[i] for i in history_indices
-                    ]
+                    actual_pattern = [full_sequence[i] for i in history_indices]
 
                     if actual_pattern == pattern:
                         context_map[ctx_name].append(epoch_pos)
 
         # Log
         for ctx_name, indices in context_map.items():
-            print(
-                f"  Contexto '{ctx_name}': "
-                f"{len(indices)} épocas encontradas"
-            )
+            print(f"  Contexto '{ctx_name}': {len(indices)} épocas encontradas")
 
         return context_map
 
@@ -122,22 +120,22 @@ class ContextMapper:
         raw_path: str,
     ) -> Dict[str, mne.Epochs]:
         """
-        Pipeline completo: extrai a sequência do raw, classifica
-        as épocas sobreviventes e retorna sub-epochs por contexto.
+        Full pipeline: load the raw sequence, classify the surviving epochs
+        and return sub-epochs per context.
 
         Parameters
         ----------
         epochs : mne.Epochs
-            Objeto epochs (já pré-processado, com rejeições aplicadas).
+            Processed epochs (with rejections already applied).
         raw_path : str
-            Caminho para o arquivo raw original.
+            Path to the raw file.
 
         Returns
         -------
         context_epochs : dict
-            {context_name: mne.Epochs} — subconjuntos de epochs.
+            ``{context_name: mne.Epochs}`` subsets.
         """
-        full_sequence, _ = self.get_full_sequence(raw_path)
+        full_sequence = self.get_full_sequence(raw_path)
         surviving_indices = epochs.selection
 
         print(f"\n{'='*55}")
@@ -146,17 +144,12 @@ class ContextMapper:
         print(f"  Épocas sobreviventes: {len(surviving_indices)}")
         print(f"{'='*55}")
 
-        context_map = self.classify_epochs(
-            full_sequence, surviving_indices
-        )
+        context_map = self.classify_epochs(full_sequence, surviving_indices)
 
         context_epochs = {}
         for ctx_name, epoch_indices in context_map.items():
             if len(epoch_indices) == 0:
-                print(
-                    f"  ⚠ Contexto '{ctx_name}': nenhuma época, "
-                    f"pulando."
-                )
+                print(f"  ⚠ Contexto '{ctx_name}': nenhuma época, pulando.")
                 continue
             context_epochs[ctx_name] = epochs[epoch_indices]
 

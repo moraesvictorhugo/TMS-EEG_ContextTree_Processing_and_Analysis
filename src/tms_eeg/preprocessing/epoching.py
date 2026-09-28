@@ -1,3 +1,5 @@
+import re
+
 import mne
 import numpy as np
 from tms_eeg.config.settings import ProjectConfig
@@ -38,7 +40,6 @@ class EEGEpocher:
 
         if resolved_id:
             # Build regexp to match only the resolved labels
-            import re
             pattern = "|".join(re.escape(k) for k in resolved_id)
             try:
                 events, event_id = mne.events_from_annotations(

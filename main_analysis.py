@@ -1,227 +1,170 @@
-"""Main analysis pipeline for TMS-EEG data."""
+"""Per-subject analysis: feature extraction by condition and by context.
 
-from tms_eeg.config.settings import ProjectConfig
-from tms_eeg.io.reader import load_data, get_raw_path
-from tms_eeg.io.writer import Writer
-from tms_eeg.analysis.features import FeatureExtractor
+For every subject in ``config.analysis.subjects`` this script:
+
+1. Loads the preprocessed epochs (``data/processed/<subject>/processed_full``).
+2. Normalises the condition labels (8bit 1/2/3 -> 0/1/2).
+3. Computes condition-level features (N15-P30 / N15-P60 / N100-P180
+   peak-to-peak amplitudes, GMFP / LMFP and their component peaks).
+4. Maps the surviving epochs to the context tree and repeats the feature
+   extraction per context.
+5. Writes a tidy (long) metrics CSV per subject in ``data/group/`` and a
+   combined ``database.csv`` consumed by ``main_statistics.py`` and
+   ``main_plotting.py``.
+
+Usage
+-----
+    python main_analysis.py                 # all subjects, with plots
+    python main_analysis.py --subject V05   # single subject
+    python main_analysis.py --no-plots      # headless
+"""
+
+from __future__ import annotations
+
+import argparse
+
+import pandas as pd
+
 from tms_eeg.analysis.context import ContextMapper
+from tms_eeg.analysis.features import FeatureExtractor
 from tms_eeg.analysis.group import MetricsCollector
-from tms_eeg.visualization.tep_plots import TEPPlotter
-from tms_eeg.visualization.gfp_plots import MFPPlotter
-
-# Set backend
+from tms_eeg.analysis.labels import normalize_event_id
 from tms_eeg.config.environment import setup_plotting_backend
-setup_plotting_backend()
+from tms_eeg.config.settings import ProjectConfig
+from tms_eeg.io.reader import get_raw_path, load_data
+from tms_eeg.io.writer import Writer
+from tms_eeg.visualization.gfp_plots import MFPPlotter
+from tms_eeg.visualization.tep_plots import TEPPlotter
 
-collector = MetricsCollector()
-subjects = ProjectConfig().analysis.subjects
+# Component pairs used for peak-to-peak amplitude extraction.
+P2P_PAIRS = [("N15", "P30"), ("N15", "P60"), ("N100", "P180")]
 
-for subject_id in subjects:
+
+def analyze_subject(subject_id: str, run_plots: bool = True) -> pd.DataFrame:
+    """Compute all condition- and context-level features for one subject.
+
+    Returns
+    -------
+    pd.DataFrame
+        Tidy metrics rows for this subject (long format).
+    """
     config = ProjectConfig(subject_id=subject_id)
-    epochs = load_data(config, data_type="epochs")
-    
-    # ── Renomear condições ───────────────────────────────────────────
-    label_map = {"8bit 1": "0", "8bit 2": "1", "8bit 3": "2"}
-    epochs.event_id = {label_map[k.lower()]: v for k, v in epochs.event_id.items()}
+    config.plots.analysis_plots = config.plots.analysis_plots and run_plots
 
-    # ── Shared objects ───────────────────────────────────────────────
+    epochs = load_data(config, data_type="epochs")
+    normalize_event_id(epochs, config.events.label_rename)
+
     writer = Writer(config)
     extractor = FeatureExtractor(
-        epochs,
-        config.analysis.channels_of_interest,
-        config.analysis.time_windows,
-    )
+        epochs, config.analysis.channels_of_interest, config.analysis.time_windows)
     tep_plotter = TEPPlotter(config=config, writer=writer)
     mfp_plotter = MFPPlotter(times=epochs.times, config=config, writer=writer)
+    collector = MetricsCollector()
 
-    # ================================================================ #
-    #  PART 1 — ANÁLISE POR CONDIÇÃO (8Bit 1 / 2 / 3)
-    # ================================================================ #
+    # ==================================================================== #
+    #  Part 1 - Condition level (8bit 0/1/2)
+    # ==================================================================== #
+    evokeds = extractor.get_evokeds()
 
-    # # ── Evokeds (ROI) ───────────────────────────────────────────────
-    # evokeds = extractor.get_evokeds()
+    if config.plots.analysis_plots:
+        tep_plotter.plot_mean_tep(evokeds=evokeds)
 
-    # # ── TEP plots ────────────────────────────────────────────────────
-    # tep_plotter.plot_mean_tep(evokeds=evokeds)
+    for comp1, comp2 in P2P_PAIRS:
+        df = extractor.peak_to_peak(comp1, comp2, evokeds=evokeds)
+        collector.collect_peak_to_peak_from_df(
+            subject_id, "condition", df, f"{comp1}-{comp2}")
 
-    # # ── Peak-to-Peak calculation ─────────────────────────────────────
-    # amplitude_N15_P30 = extractor.peak_to_peak("N15", "P30", evokeds=evokeds)
-    # amplitude_N15_P60 = extractor.peak_to_peak("N15", "P60", evokeds=evokeds)
-    # amplitude_N100_P180 = extractor.peak_to_peak(
-    #     "N100", "P180", evokeds=evokeds)
-    
-    # # ── Collect peak-to-peak rows ──
-    # collector.collect_peak_to_peak_from_df(
-    #     subject_id, "condition", amplitude_N15_P30, "N15-P30"
-    # )
-    # collector.collect_peak_to_peak_from_df(
-    #     subject_id, "condition", amplitude_N15_P60, "N15-P60"
-    # )
-    # collector.collect_peak_to_peak_from_df(
-    #     subject_id, "condition", amplitude_N100_P180, "N100-P180"
-    # )
+    gmfp = extractor.compute_gmfp()
+    lmfp = extractor.compute_lmfp()
 
-    # # ── GMFP & LMFP calculation ─────────────────────────────────────
-    # gmfp = extractor.compute_gmfp()
-    # lmfp = extractor.compute_lmfp()
+    if config.plots.analysis_plots:
+        mfp_plotter.plot_gmfp_lmfp(
+            gmfp, lmfp, time_windows=config.analysis.time_windows)
+        mfp_plotter.plot_overlay(
+            gmfp, label="GMFP", time_windows=config.analysis.time_windows)
+        mfp_plotter.plot_overlay(
+            lmfp, label="LMFP", time_windows=config.analysis.time_windows)
 
-    # # ── MFP peak extraction ──────────────────────────────────────────
-    # df_gmfp_peaks = extractor.extract_mfp_peaks(gmfp, label="GMFP")
-    # df_lmfp_peaks = extractor.extract_mfp_peaks(lmfp, label="LMFP")
-    
-    # # ── Collect MFP peaks rows ──
-    # collector.collect_mfp_peaks_from_df(
-    #     subject_id, "condition", df_gmfp_peaks, "GMFP"
-    # )
-    # collector.collect_mfp_peaks_from_df(
-    #     subject_id, "condition", df_lmfp_peaks, "LMFP"
-    # )
-   
-    # # ── MFP Plots ────────────────────────────────────────────────────
-    # # Side-by-side GMFP vs LMFP per condition
-    # mfp_plotter.plot_gmfp_lmfp(
-    #     gmfp, lmfp,
-    #     time_windows=config.analysis.time_windows,
-    # )
+    collector.collect_mfp_peaks_from_df(
+        subject_id, "condition", extractor.extract_mfp_peaks(gmfp, label="GMFP"), "GMFP")
+    collector.collect_mfp_peaks_from_df(
+        subject_id, "condition", extractor.extract_mfp_peaks(lmfp, label="LMFP"), "LMFP")
 
-    # # Overlay all conditions (one plot for GMFP, one for LMFP)
-    # mfp_plotter.plot_overlay(
-    #     gmfp, label="GMFP", time_windows=config.analysis.time_windows)
-    # mfp_plotter.plot_overlay(
-    #     lmfp, label="LMFP", time_windows=config.analysis.time_windows)
-
-    # ================================================================ #
-    #  PART 2 — ANÁLISE POR CONTEXTO (árvore de contexto)
-    # ================================================================ #
-
+    # ==================================================================== #
+    #  Part 2 - Context level (context tree)
+    # ==================================================================== #
     raw_path = get_raw_path(config)
-    context_mapper = ContextMapper(config)
-    context_epochs = context_mapper.get_context_epochs(epochs, raw_path)
+    context_epochs = ContextMapper(config).get_context_epochs(epochs, raw_path)
 
-    # ── Evokeds por contexto (ROI) ──────────────────────────────────
-    ctx_evokeds = {
-        ctx_name: ctx_ep.average().pick(config.analysis.channels_of_interest)
-        for ctx_name, ctx_ep in context_epochs.items()
-    }
+    for ctx_name, ctx_epochs in context_epochs.items():
+        ctx_extractor = FeatureExtractor(
+            ctx_epochs, config.analysis.channels_of_interest, config.analysis.time_windows)
 
-    # ── TEP plots por contexto ───────────────────────────────────────
-    tep_plotter.plot_mean_tep(evokeds=ctx_evokeds)
+        ctx_evokeds = ctx_extractor.get_evokeds()
 
-    # ── Feature extraction per context (reusing FeatureExtractor) ──
-    # ctx_gmfp = {}
-    # ctx_lmfp = {}
-    # ctx_gmfp_peaks = {}
-    # ctx_lmfp_peaks = {}
-    # ctx_p2p_N15_P30 = {}
-    # ctx_p2p_N15_P60 = {}
-    # ctx_p2p_N100_P180 = {}
-    
-    # for ctx_name, ctx_ep in context_epochs.items():
-    #     # Create a FeatureExtractor for this context subset
-    #     ctx_extractor = FeatureExtractor(
-    #         ctx_ep,
-    #         config.analysis.channels_of_interest,
-    #         config.analysis.time_windows,
-    #     )
-        
-    #     # Compute GMFP and LMFP using the extractor
-    #     ctx_gmfp_dict = ctx_extractor.compute_gmfp()
-    #     ctx_lmfp_dict = ctx_extractor.compute_lmfp()
-        
-    #     # Store for plotting (single context → single curve)
-    #     ctx_gmfp[ctx_name] = list(ctx_gmfp_dict.values())[0]
-    #     ctx_lmfp[ctx_name] = list(ctx_lmfp_dict.values())[0]
-        
-    #     # Extract peaks
-    #     ctx_gmfp_peaks[ctx_name] = ctx_extractor.extract_mfp_peaks(
-    #         ctx_gmfp_dict, label="GMFP"
-    #     )
-    #     ctx_lmfp_peaks[ctx_name] = ctx_extractor.extract_mfp_peaks(
-    #         ctx_lmfp_dict, label="LMFP"
-    #     )
-        
-    #     # Compute peak-to-peak amplitudes
-    #     ctx_evokeds_single = ctx_extractor.get_evokeds()
-    #     ctx_p2p_N15_P30[ctx_name] = ctx_extractor.peak_to_peak(
-    #         "N15", "P30", evokeds=ctx_evokeds_single
-    #     )
-    #     ctx_p2p_N15_P60[ctx_name] = ctx_extractor.peak_to_peak(
-    #         "N15", "P60", evokeds=ctx_evokeds_single
-    #     )
-    #     ctx_p2p_N100_P180[ctx_name] = ctx_extractor.peak_to_peak(
-    #         "N100", "P180", evokeds=ctx_evokeds_single
-    #     )
-    
-    # ── Collect context metrics ──
-    # for ctx_name, df in ctx_p2p_N15_P30.items():
-    #     df = df.copy()
-    #     df["condition"] = ctx_name
-    #     collector.collect_peak_to_peak_from_df(
-    #         subject_id, "context", df, "N15-P30"
-    #     )
-    
-    # for ctx_name, df in ctx_p2p_N15_P60.items():
-    #     df = df.copy()
-    #     df["condition"] = ctx_name
-    #     collector.collect_peak_to_peak_from_df(
-    #         subject_id, "context", df, "N15-P60"
-    #     )
+        # Peak-to-peak per context (label rows with the context name).
+        for comp1, comp2 in P2P_PAIRS:
+            df = ctx_extractor.peak_to_peak(comp1, comp2, evokeds=ctx_evokeds).copy()
+            df["condition"] = ctx_name
+            collector.collect_peak_to_peak_from_df(
+                subject_id, "context", df, f"{comp1}-{comp2}")
 
-    # for ctx_name, df in ctx_p2p_N100_P180.items():
-    #     df = df.copy()
-    #     df["condition"] = ctx_name
-    #     collector.collect_peak_to_peak_from_df(
-    #         subject_id, "context", df, "N100-P180"
-    #     )
+        # GMFP / LMFP peaks per context.
+        for label, mfp in (("GMFP", ctx_extractor.compute_gmfp()),
+                           ("LMFP", ctx_extractor.compute_lmfp())):
+            df = ctx_extractor.extract_mfp_peaks(mfp, label=label).copy()
+            df["condition"] = ctx_name
+            collector.collect_mfp_peaks_from_df(subject_id, "context", df, label)
 
-    # for ctx_name, df in ctx_gmfp_peaks.items():
-    #     df = df.copy()
-    #     df["condition"] = ctx_name
-    #     collector.collect_mfp_peaks_from_df(
-    #         subject_id, "context", df, "GMFP"
-    #     )
+    if config.plots.analysis_plots and context_epochs:
+        ctx_evokeds_all = {
+            name: ctx_ep.average().pick(config.analysis.channels_of_interest)
+            for name, ctx_ep in context_epochs.items()
+        }
+        tep_plotter.plot_mean_tep(evokeds=ctx_evokeds_all)
+        tep_plotter.plot_context_comparison(context_epochs)
 
-    # for ctx_name, df in ctx_lmfp_peaks.items():
-    #     df = df.copy()
-    #     df["condition"] = ctx_name
-    #     collector.collect_mfp_peaks_from_df(
-    #         subject_id, "context", df, "LMFP"
-    #     )
+    df = collector.to_dataframe()
+    subject_csv = config.paths.group_dir / f"{subject_id}_metrics.csv"
+    subject_csv.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(subject_csv, index=False)
+    print(f"\n[{subject_id}] {len(df)} metric rows -> {subject_csv}")
 
-    
-    
-    # # ── MFP Plots por contexto ───────────────────────────────────────
-    # mfp_plotter.plot_overlay(
-    #     ctx_gmfp, label="GMFP_context",
-    #     time_windows=config.analysis.time_windows,
-    # )
-    # mfp_plotter.plot_overlay(
-    #     ctx_lmfp, label="LMFP_context",
-    #     time_windows=config.analysis.time_windows,
-    # )
+    return df
 
-    # ── Contexts branch 1 comparison ──────────────────────────────────────────
-    tep_plotter.plot_context_comparison(context_epochs)
-    
-    # ── Time evolution comparison ────────────────────────────────────
-    # # Metades (default)
-    # tep_plotter.plot_context_temporal_comparison(context_epochs)
 
-    # # Apenas ctx_01, ctx_11, ctx_21 em terços com rótulos customizados
-    # tep_plotter.plot_context_temporal_comparison(
-    #     context_epochs,
-    #     n_splits=3,
-    #     split_labels=["Início", "Meio", "Fim"],
-    #     contexts=["ctx_01", "ctx_11", "ctx_21"],
-    # )
-    
-    # ================================================================ #
-    #  COLLECT RESULTS (tidy format - rows already collected above)
-    # ================================================================ #
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--subject",
+        default=None,
+        help="Single subject to analyse (default: all subjects in config)",
+    )
+    parser.add_argument(
+        "--no-plots",
+        action="store_true",
+        help="Disable analysis figures (config.plots.analysis_plots is ignored)",
+    )
+    args = parser.parse_args()
 
-# ── Export to CSV if enabled ──
-config_check = ProjectConfig()
-database = collector.export_csv(
-    output_path="data/group/database.csv",
-    export_enabled=config_check.io.export_data,
-)
+    setup_plotting_backend()
+    config = ProjectConfig()
+
+    subjects = [args.subject] if args.subject else config.analysis.subjects
+    frames = []
+    for subject_id in subjects:
+        frames.append(analyze_subject(subject_id, run_plots=not args.no_plots))
+
+    # ---- Combined group database (input of statistics / plotting) ----
+    if frames:
+        database = pd.concat(frames, ignore_index=True)
+        if config.io.export_data:
+            config.paths.metrics_csv.parent.mkdir(parents=True, exist_ok=True)
+            database.to_csv(config.paths.metrics_csv, index=False)
+            print(f"\nCombined metrics database -> {config.paths.metrics_csv}")
+            print(f"Total rows: {len(database)}")
+            print(f"Columns: {list(database.columns)}")
+
+
+if __name__ == "__main__":
+    main()

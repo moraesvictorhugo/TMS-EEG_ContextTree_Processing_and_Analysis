@@ -73,124 +73,120 @@ pip install matlabengine
 ## 📁 Project Structure
 
 ```
-MEPs-and-TEPs-with-Context-Tree/
-├── data/                           # Data storage
-│   ├── raw/                        # Original, unmodified EEG files
-│   └── processed/                  # Output from preprocessing/processing steps
+TMS-EEG_ContextTree_Processing_and_Analysis/
+├── main_preprocessing.py            # Preprocessing entry point (ends with epochs exports)
+├── main_analysis.py                 # Per-subject feature extraction (condition + context)
+├── main_statistics.py               # Group statistics (under construction)
+├── main_plotting.py                 # Group-level plots
+├── pyproject.toml                   # Project configuration / dependencies
+├── uv.lock                          # Dependency lock file
 │
-├── src/                            # Main source code
-│   └── tms_eeg/                    # TMS-EEG package
-│       ├── __init__.py
-│       ├── config/                 # Configuration files
-│       │   ├── __init__.py
-│       │   ├── environment.py      # Environment setup
-│       │   └── settings.py         # Configuration dataclasses
-│       ├── io/                     # File loading and saving
-│       │   ├── __init__.py
-│       │   ├── reader.py           # Data loading utilities
-│       │   └── writer.py           # Data saving utilities
-│       ├── preprocessing/          # Signal processing pipeline
-│       │   ├── __init__.py
-│       │   ├── annotation_processor.py  # Event annotation processing
-│       │   ├── artifacts.py        # TMS artifact removal
-│       │   ├── downsampling.py     # Signal downsampling
-│       │   ├── epoching.py         # Epoch creation
-│       │   ├── filtering.py        # Signal filtering
-│       │   └── ica.py              # Independent Component Analysis
-│       ├── analysis/               # Analysis modules
-│       │   ├── __init__.py
-│       │   ├── context.py          # Context tree analysis
-│       │   ├── features.py         # Feature extraction
-│       │   └── group.py            # Group-level analysis
-│       └── visualization/          # Plotting and visualization
-│           ├── __init__.py
-│           ├── emg_plots.py        # EMG signal plots
-│           ├── gfp_plots.py        # Global Field Power plots
-│           ├── group_plots.py      # Group analysis plots
-│           └── tep_plots.py        # TMS-evoked potential plots
+├── src/tms_eeg/                     # TMS-EEG package
+│   ├── config/                      # ALL pipeline parameters
+│   │   ├── environment.py           # Plot backend setup
+│   │   └── settings.py              # Dataclass configuration (paths, events, filters, ...)
+│   ├── io/                          # File loading and saving
+│   │   ├── reader.py                # load_data / get_raw_path
+│   │   └── writer.py                # Writer + shared save_figure helper
+│   ├── preprocessing/
+│   │   ├── pipeline.py              # PreprocessingPipeline orchestrator (end-to-end)
+│   │   ├── annotation_processor.py  # Event annotation processing (8-bit / text fallback)
+│   │   ├── annotation_exporter.py   # Epoch annotations -> .mat (context-tree format)
+│   │   ├── artifacts.py             # TMS artifact removal (cubic + constant pass)
+│   │   ├── downsampling.py          # Signal downsampling
+│   │   ├── epoching.py              # Epoch creation + EpochDropper (JSON)
+│   │   ├── filtering.py             # Bandpass + notch filters
+│   │   └── ica.py                   # Independent Component Analysis
+│   ├── analysis/
+│   │   ├── context.py               # Context tree analysis (ContextMapper)
+│   │   ├── features.py              # Feature extraction (P2P, GMFP/LMFP)
+│   │   ├── group.py                 # MetricsCollector (tidy long format)
+│   │   └── labels.py                # Event-id normalisation
+│   └── visualization/
+│       ├── tep_plots.py             # TMS-evoked potential plots
+│       ├── gfp_plots.py             # GMFP / LMFP curves
+│       └── group_plots.py           # Group-level plots
 │
-├── notebooks/                      # Jupyter notebooks for exploration
-│   └── 01_data_exploration.ipynb
-│
-├── results/                        # Analysis results
-│   └── group/                      # Group-level results
-│
-├── trigger/                        # External dependencies (PyTEP-SOUND-SSP-SIR)
-│
-├── main_preprocessing.py           # Preprocessing pipeline entry point
-├── main_analysis.py               # Analysis pipeline entry point
-├── main_group.py                  # Group analysis entry point
-├── pyproject.toml                 # Project configuration
-├── uv.lock                        # Dependency lock file
-├── estrutura.txt                  # Project structure documentation
-└── README.md                      # This file
+├── tests/
+│   └── smoke_test.py                # Lightweight tests (no pytest required)
+├── utils/                           # Standalone one-off utilities
+├── data/
+│   ├── raw/                         # Original .bdf files + sequence .txt
+│   ├── processed/                   # Exported epochs + per-subject QC JSONs
+│   └── group/                       # Metrics CSVs (from main_analysis.py)
+└── README.md                        # This file
 ```
 
 ### Key Modules Overview
 
-- **`src/tms_eeg/config/`**: Configuration management using dataclasses for flexible parameter control
-- **`src/tms_eeg/io/`**: Data input/output operations with support for various EEG file formats
-- **`src/tms_eeg/preprocessing/`**: Complete preprocessing pipeline including artifact removal, filtering, and ICA
-- **`src/tms_eeg/analysis/`**: Core analysis modules for TEP extraction, context tree analysis, and group statistics
-- **`src/tms_eeg/visualization/`**: Comprehensive plotting functions for TEPs, GFP, and context comparisons
-  - **`tep_plots.py`**: TMS-evoked potential visualization with topographic maps and time courses
-  - **`gfp_plots.py`**: Global and Local Mean Field Power analysis and plotting
-  - **`emg_plots.py`**: EMG signal visualization for muscle activity monitoring
-  - **`group_plots.py`**: Group-level statistical comparisons and visualizations
+- **`src/tms_eeg/config/settings.py`**: the single configuration file — all paths and parameters live here.
+- **`src/tms_eeg/preprocessing/pipeline.py`**: reproduces the full preprocessing in a single, headless-friendly orchestrator.
+- **`src/tms_eeg/analysis/`**: core analysis modules for TEP extraction, context tree analysis, and tidy metrics collection.
+- **`src/tms_eeg/visualization/`**: plotting functions for TEPs, GMFP/LMFP, and group-level comparisons.
+
 
 ## ⚡ Quick Start
 
-### 1. Basic Preprocessing
+### 1. Preprocessing
 
-```python
-# Run preprocessing pipeline
-python main_preprocessing.py
+```bash
+# Single subject with interactive QC plots (requires a display)
+python main_preprocessing.py --subject V04 --qc
+
+# Headless (applies the QC decisions recorded in data/processed/*.json)
+python main_preprocessing.py --subject V04
 ```
 
-This will:
-- Load raw EEG data
-- Remove TMS artifacts
-- Apply filtering and epoching
-- Perform ICA decomposition
-- Save processed data
+This:
+- Loads the raw `.bdf`, processes the annotations (8-bit or text file) and creates EEG/EMG epochs
+- Removes the TMS artifact (cubic spline), drops+interpolates bad channels, ICA, SOUND,  SSP-SIR
+- Filters (bandpass + notch), applies the recorded epoch drops and finishes by exporting
+  the `.fif` variants (`processed_full`, `processed_pre_and_post`, `processed_post_only`,
+  `emg_processed`) and the context-tree `.mat` files under `data/processed/<subject>/`.
 
-### 2. Analysis Pipeline
+### 2. Analysis (per subject)
 
-```python
-# Run analysis pipeline
+```bash
+# All subjects in config.analysis.subjects
 python main_analysis.py
+
+# Single subject / headless
+python main_analysis.py --subject V05 --no-plots
 ```
 
-This will:
-- Load preprocessed epochs
-- Extract TEP features (peak-to-peak amplitudes)
-- Compute GMFP/LMFP measures
-- Perform context tree analysis
-- Generate visualizations
+This extracts the condition- and context-level features (peak-to-peak amplitudes,
+GMFP/LMFP peaks), writes `data/group/<subject>_metrics.csv` and a combined
+`data/group/database.csv`.
 
-### 3. Group Analysis
+### 3. Group plotting
 
-```python
-# Run group-level analysis
-python main_group.py
+```bash
+python main_plotting.py [--metrics data/group/database.csv] [--output-dir results/group]
 ```
 
-This will aggregate results across all subjects and generate group-level statistics.
+Loads the metrics database and renders group box/strip plots and the P30 amplitude
+summary (requires `main_analysis.py` to have been run first).
+
+### 4. Group statistics (future)
+
+```bash
+python main_statistics.py   # stub — will run group-level statistics
+```
 
 ## ⚙️ Configuration
 
-The project uses a flexible configuration system based on Python dataclasses. Configuration is managed through `src/tms_eeg/config/settings.py`.
-
-### Basic Configuration
+All parameters live in a single file: `src/tms_eeg/config/settings.py`.
+`ProjectConfig` bundles the sections (`paths`, `io`, `events`, `filters`, `sound`,
+`channels`, `epochs`, `ica`, `analysis`, `plots`).
 
 ```python
-from src.tms_eeg.config.settings import ProjectConfig
+from tms_eeg.config.settings import ProjectConfig
 
 # Create configuration for a specific subject
 config = ProjectConfig(subject_id="V07")
 
 # Access configuration sections
-print(config.analysis.subjects)  # List of subjects
+print(config.analysis.subjects)  # List of subjects (temporary selection)
 print(config.analysis.channels_of_interest)  # EEG channels to analyze
 print(config.analysis.time_windows)  # Time windows for analysis
 ```
@@ -215,7 +211,7 @@ The context tree analysis can be customized by modifying the context definitions
 ```python
 config.analysis.context_definitions = {
     "ctx_0": [0],           # Current stimulus = 0, any past
-    "ctx_2": [2],           # Current stimulus = 2, any past  
+    "ctx_2": [2],           # Current stimulus = 2, any past
     "ctx_01": [0, 1],       # Previous = 0, current = 1
     "ctx_11": [1, 1],       # Previous = 1, current = 1
     "ctx_21": [2, 1],       # Previous = 2, current = 1
@@ -229,21 +225,22 @@ config.analysis.context_definitions = {
 The preprocessing pipeline (`main_preprocessing.py`) handles:
 
 1. **Data Loading**: Load raw EEG data with proper channel configuration
-2. **Artifact Removal**: Remove TMS-induced artifacts using baseline correction
-3. **Filtering**: Apply bandpass and notch filters
-4. **Epoching**: Create epochs around TMS pulses
-5. **ICA Decomposition**: Remove remaining artifacts using Independent Component Analysis
-6. **Downsampling**: Reduce sampling rate for analysis
-7. **Visualization**: Generate quality control plots
+2. **Annotation Processing**: Replace `Stimulus A` with the 8-bit / text conditions
+3. **Epoching**: Create epochs around TMS pulses (EEG + EMG)
+4. **Artifact Removal**: Cubic-spline interpolation of the TMS artifact
+5. **ICA / SOUND / SSP-SIR**: Remove remaining (ocular, decay) artifacts
+6. **Filtering**: Bandpass + notch
+7. **Epoch drops**: apply the per-subject exclusions recorded during QC
+8. **Exports**: `.fif` (full / cropped / EMG) and context-tree `.mat`
 
 ```python
 # Example: Custom preprocessing
-from src.tms_eeg.config.settings import ProjectConfig
-from src.tms_eeg.preprocessing.epoching import EEGEpocher
-from src.tms_eeg.preprocessing.artifacts import ArtifactRemover
+from tms_eeg.config.settings import ProjectConfig
+from tms_eeg.preprocessing.epoching import EEGEpocher
+from tms_eeg.preprocessing.artifacts import ArtifactRemover
 
 config = ProjectConfig(subject_id="V07")
-# ... preprocessing steps as defined in main_preprocessing.py
+# ... preprocessing steps as defined in src/tms_eeg/preprocessing/pipeline.py
 ```
 
 ### Analysis
@@ -257,21 +254,23 @@ The analysis pipeline (`main_analysis.py`) performs:
 
 ```python
 # Example: Custom analysis
-from src.tms_eeg.config.settings import ProjectConfig
-from src.tms_eeg.analysis.features import FeatureExtractor
-from src.tms_eeg.analysis.context import ContextMapper
+from tms_eeg.config.settings import ProjectConfig
+from tms_eeg.analysis.features import FeatureExtractor
+from tms_eeg.analysis.context import ContextMapper
 
 config = ProjectConfig(subject_id="V07")
 # ... analysis steps as defined in main_analysis.py
 ```
 
-### Group Analysis
+### Group Plotting
 
-The group analysis (`main_group.py`) aggregates results across subjects:
+The group plotting (`main_plotting.py`) loads the tidy metrics database and
+renders box/strip plots per condition/context and the P30 amplitude summary.
 
-1. **Data Aggregation**: Combine results from all subjects
-2. **Statistical Analysis**: Compute group-level statistics
-3. **Visualization**: Generate group comparison plots
+### Group Statistics (future)
+
+The group statistics (`main_statistics.py`) will read the same metrics database
+and run group-level statistical tests across conditions and contexts.
 
 ## 📈 Visualization Capabilities
 
@@ -295,10 +294,10 @@ The project provides comprehensive visualization tools for TMS-EEG analysis:
 - **Branch Analysis**: Specific comparisons between context branches
 - **Statistical Overlays**: Confidence intervals and significance markers
 
-### EMG Analysis
-- **Muscle Activity Monitoring**: EMG signal visualization for quality control
-- **Artifact Detection**: Identification of muscle artifacts in EEG data
-- **Time-Frequency Analysis**: EMG power across different frequency bands
+### EMG Data
+
+EMG epochs are created and exported during preprocessing (`emg_processed`),
+together with the EEG epochs, for downstream (separate) analysis.
 
 ### Group-Level Visualizations
 - **Statistical Comparisons**: Group means with error bars and significance testing
@@ -311,21 +310,31 @@ The project provides comprehensive visualization tools for TMS-EEG analysis:
 ### Preprocessing Workflow
 
 ```
-Raw EEG Data
+Raw EEG (.bdf)
     ↓
-Channel Configuration & Montage
+Channel configuration & montage
     ↓
-TMS Artifact Removal
+Annotation processing (8-bit / text file)
     ↓
-Filtering (Bandpass + Notch)
+Epoch creation (-0.8 s to +0.8 s, EEG + EMG)
     ↓
-Epoch Creation (-0.8s to +0.8s)
+TMS artifact removal (cubic spline interpolation)
     ↓
-ICA Decomposition
+Bad channel drop + interpolation (QC JSON)
     ↓
-Downsampling (725 Hz)
+Detrend + baseline correction
     ↓
-Processed Epochs
+ICA (components from QC JSON)
+    ↓
+SOUND + average reference + SSP-SIR
+    ↓
+Downsampling (EEG 1000 Hz / EMG 3000 Hz)
+    ↓
+Constant artifact pass + filters (bandpass + notch)
+    ↓
+Epoch drops (2nd run, QC JSON)
+    ↓
+Crop + Export (.fif variants + context-tree .mat)
 ```
 
 ### Analysis Workflow

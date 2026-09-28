@@ -1,10 +1,10 @@
-from typing import List, Tuple
+from typing import List
 
 import numpy as np
 import mne
 
-from src.tms_eeg.io.writer import Writer
-from src.tms_eeg.config.settings import ProjectConfig
+from tms_eeg.io.writer import Writer
+from tms_eeg.config.settings import ProjectConfig
 
 
 class EpochAnnotationExporter:
@@ -12,7 +12,7 @@ class EpochAnnotationExporter:
 
     The class is deliberately lightweight – it stores the project configuration
     and pre‑computes a lower‑cased, whitespace‑free mapping from annotation names
-    to the integer symbols defined in ``config.analysis.name_to_symbol``.  The public
+    to the integer symbols defined in ``config.events.name_to_symbol``.  The public
     methods provide a clear, testable API:
 
     * :meth:`extract_annotations` – returns the epoch indexes and a list of
@@ -28,33 +28,29 @@ class EpochAnnotationExporter:
         self.config = config
         # Normalise the name‑to‑symbol map once for fast look‑ups.
         self._symbol_map_lower = {
-            k.lower().replace(" ", ""): v for k, v in self.config.analysis.name_to_symbol.items()
+            k.lower().replace(" ", ""): v for k, v in self.config.events.name_to_symbol.items()
         }
 
     # ---------------------------------------------------------------------
     # Annotation extraction
     # ---------------------------------------------------------------------
-    def extract_annotations(self, epochs: mne.Epochs) -> Tuple[np.ndarray, List[str]]:
-        """Extract epoch indexes and annotation strings from ``epochs``.
+    def extract_annotations(self, epochs: mne.Epochs) -> List[str]:
+        """Extract the annotation strings corresponding to each epoch.
 
         Parameters
         ----------
         epochs : mne.Epochs
-            The epochs from which to pull the ``selection`` attribute and the
-            annotation labels.
+            The epochs from which to pull the annotation labels.
 
         Returns
         -------
-        Tuple[np.ndarray, List[str]]
-            ``(indexes, annotations)`` where ``indexes`` is ``epochs.selection``
-            and ``annotations`` is a list of the human‑readable annotation names
-            derived from ``epochs.event_id``.
+        List[str]
+            One human‑readable annotation name per epoch (in epoch order),
+            derived from ``epochs.event_id`` and ``epochs.events``.
         """
-        indexes = epochs.selection
         # Reverse the event_id mapping: {event_code: label}
         rev_id = {v: k for k, v in epochs.event_id.items()}
-        annotations = [rev_id[code] for code in epochs.events[:, 2]]
-        return indexes, annotations
+        return [rev_id[code] for code in epochs.events[:, 2]]
 
     # ---------------------------------------------------------------------
     # Symbol mapping
@@ -64,7 +60,7 @@ class EpochAnnotationExporter:
 
         The mapping mirrors the original script: annotation names are lower‑cased
         and spaces are removed before looking up the integer symbol in the
-        configuration's ``analysis.name_to_symbol`` dictionary.
+        configuration's ``events.name_to_symbol`` dictionary.
         """
         symbols = [
             self._symbol_map_lower[ann.lower().replace(" ", "")]

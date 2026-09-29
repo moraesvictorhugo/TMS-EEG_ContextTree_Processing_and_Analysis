@@ -9,9 +9,9 @@ from tms_eeg.io.writer import Writer
 from tms_eeg.preprocessing.annotation_exporter import EpochAnnotationExporter
 from tms_eeg.preprocessing.annotation_processor import AnnotationProcessor
 from tms_eeg.preprocessing.artifacts import ArtifactRemover
-from tms_eeg.preprocessing.downsampling import Downsampler
-from tms_eeg.preprocessing.epoching import EEGEpocher, EpochDropper
-from tms_eeg.preprocessing.filtering import Filter
+from tms_eeg.preprocessing.downsampling import downsample, downsample_emg_channels
+from tms_eeg.preprocessing.epoching import create_epochs, drop_from_json
+from tms_eeg.preprocessing.filtering import bandpass, notch_filter
 from tms_eeg.preprocessing.ica import EEGICA
 from tms_eeg.visualization.tep_plots import TEPPlotter
 
@@ -31,15 +31,14 @@ raw_data = load_data(config)
 
 # Set EOG and EMG channels and set montage
 raw_data.set_channel_types({
-    config.channels.eog_label: 'eog', config.channels.emg_label: 'emg'})
-raw_data.set_montage(config.channels.eeg_montage)
+    config.ch_eog_label: 'eog', config.ch_emg_label: 'emg'})
+raw_data.set_montage(config.ch_eeg_montage)
 
 # Artifact removal
 raw_data = ArtifactRemover(config).remove_tms_artifact(raw_data, mode='cubic')
 
 # Notch Filter
-Filter = Filter(config)
-data_filtered = Filter.notch_filter(raw_data, "eeg", band=(58, 62), harmonics=3)
+data_filtered = notch_filter(raw_data, config.filter_notch, "eeg", band=(58, 62), harmonics=3)
 
 # HighPass Filter
 data_filtered.filter(l_freq=1, h_freq=None, fir_design='firwin')
@@ -56,9 +55,8 @@ data_filtered = annotation_processor.process_annotations(data_filtered)
 
 
 
-# Create epochs using standard EEGEpocher
-epocher = EEGEpocher(config)                    # Checar se faz a correção baseline de (-0,25, -0,1) s
-epochs_eeg = epocher.create_epochs(data_filtered)    # e detrend=1
+# Create epochs using standard pipeline          # Checar se faz a correção baseline de (-0,25, -0,1) s
+epochs_eeg = create_epochs(data_filtered, config)    # e detrend=1
 
 ### Exemplo:
 
@@ -75,7 +73,7 @@ epochs = mne.Epochs(
 
 # Create epochs for EMG data
 raw_data_emg = raw_data.copy().pick("emg")
-epochs_emg = epocher.create_epochs(raw_data_emg)
+epochs_emg = create_epochs(raw_data_emg, config)
 
 # # Baseline correction
 # epochs_eeg.apply_baseline(baseline=(-0.25, -0.01))    # ver se não faz diretamente em cima
@@ -116,14 +114,14 @@ epochs_eeg.plot()
 epochs_eeg.interpolate_bads(reset_bads=True)
 
 # Remove bad trials using pre-identified epoch indices from JSON
-# epochs_eeg = EpochDropper(config).drop_from_json(epochs_eeg,
-#     "data/idx_epochs_rem_1st_run.json")
+# epochs_eeg = drop_from_json(epochs_eeg,
+#     "data/idx_epochs_rem_1st_run.json", config.subject_id)
 
 # Linear Detrend in each epoch and channel
 epochs_eeg.apply_function(lambda x: detrend(x, type='linear'), picks='all')
 
 # Baseline correction
-epochs_eeg.apply_baseline(baseline=(-0.2, -0.01))
+epochs_eeg.apply_baseline(baseline=config.epoch_baseline)
 
 # Fast ICA
 ica_processor = EEGICA(config)
@@ -136,33 +134,33 @@ ica_processor.plot_components(epochs_eeg)
 epochs_eeg = ica_processor.apply_ica(epochs_eeg, components_to_remove=[0])
 
 # Baseline correction
-epochs_eeg.apply_baseline(baseline=(-0.2, -0.01))
+epochs_eeg.apply_baseline(baseline=config.epoch_baseline)
 
 # Apply SOUND
 epochs_eeg = apply_sound(epochs_eeg, iter_num=5, lambda_val=0.1)
 
 # Set average reference            # checar se epochs_clean.set_eeg_reference("average", projection=False)
-epochs_eeg.set_eeg_reference(config.channels.eeg_reference)
+epochs_eeg.set_eeg_reference(config.ch_eeg_reference)
 
 # Apply SSP-SIR
 epochs_eeg = apply_sspsir(epochs_eeg)
 
 # Downsampling to 1000 and 3000 Hz
-epochs_eeg = Downsampler(config).downsample(epochs_eeg)
-epochs_emg = Downsampler(config).downsample_emg_channels(epochs_emg)
+epochs_eeg = downsample(epochs_eeg, config.epoch_downsample_freq)
+epochs_emg = downsample_emg_channels(epochs_emg, config.epoch_emg_downsample_freq)
 
 # Interpolate again
 epochs_eeg = mne.preprocessing.fix_stim_artifact(epochs_eeg, mode='constant', tmin=-0.005, tmax=0.010, baseline=(-0.050, -0.01))
 
 # Filter EEG data
-epochs_eeg_filtered = Filter(config).bp_filter(epochs_eeg, ch_type='eeg')
-epochs_eeg_filtered = Filter(config).notch_filter(
-    epochs_eeg_filtered, band=(58, 62), harmonics=3)
+epochs_eeg_filtered = bandpass(epochs_eeg, config.filter_eeg_bandpass, 'eeg')
+epochs_eeg_filtered = notch_filter(
+    epochs_eeg_filtered, config.filter_notch, band=(58, 62), harmonics=3)
 
 # Filter EMG data
-epochs_emg_filtered = Filter(config).bp_filter(epochs_emg, ch_type='emg')
-epochs_emg_filtered = Filter(config).notch_filter(
-    epochs_emg_filtered, band=(58, 62), harmonics=3)
+epochs_emg_filtered = bandpass(epochs_emg, config.filter_emg_bandpass, 'emg')
+epochs_emg_filtered = notch_filter(
+    epochs_emg_filtered, config.filter_notch, band=(58, 62), harmonics=3)
 
 # Verify bad epochs -> skip if already on json
 epochs_eeg_filtered.plot()
@@ -170,8 +168,8 @@ epochs_eeg_filtered.plot()
 #########################################################################################
 
 # Remove bad trials using pre-identified epoch indices from JSON
-epochs_eeg_filtered = EpochDropper(config).drop_from_json(epochs_eeg_filtered,
-    "data/idx_epochs_rem_2nd_run.json")
+epochs_eeg_filtered = drop_from_json(epochs_eeg_filtered,
+    "data/idx_epochs_rem_2nd_run.json", config.subject_id)
 
 # TEP Plots for picked channels
 tep_plotter = TEPPlotter(config)

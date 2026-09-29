@@ -12,7 +12,7 @@ class EpochAnnotationExporter:
 
     The class is deliberately lightweight – it stores the project configuration
     and pre‑computes a lower‑cased, whitespace‑free mapping from annotation names
-    to the integer symbols defined in ``config.analysis.name_to_symbol``.  The public
+    to the integer symbols defined in ``config.analysis_name_to_symbol``.  The public
     methods provide a clear, testable API:
 
     * :meth:`extract_annotations` – returns the epoch indexes and a list of
@@ -28,7 +28,7 @@ class EpochAnnotationExporter:
         self.config = config
         # Normalise the name‑to‑symbol map once for fast look‑ups.
         self._symbol_map_lower = {
-            k.lower().replace(" ", ""): v for k, v in self.config.analysis.name_to_symbol.items()
+            k.lower().replace(" ", ""): v for k, v in self.config.analysis_name_to_symbol.items()
         }
 
     # ---------------------------------------------------------------------

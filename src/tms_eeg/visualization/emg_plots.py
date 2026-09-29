@@ -3,27 +3,20 @@
 import mne
 from typing import Optional
 import matplotlib.pyplot as plt
+from tms_eeg.io.writer import save_figure
 
 
 class EMGPlotter:
     """Plots EMG-related visualizations from epochs."""
 
-    def __init__(self, config=None, xlim: tuple = None, writer=None):
+    def __init__(self, config, xlim: tuple = None, writer=None):
         self.config = config
-        self.xlim = xlim or (config.plots.emg_xlim if config else (-0.01, 0.08))
+        self.xlim = xlim or config.plot_emg_xlim
         self.writer = writer
 
     def _save_figure(self, fig, condition: str):
-        """Save figure if save_figs is enabled in config."""
-        if self.config and self.config.io.save_figs and fig is not None:
-            if self.writer:
-                writer = self.writer
-            else:
-                from tms_eeg.io.writer import Writer
-                writer = Writer(self.config)
-            
-            filename = f"emg_{condition}"
-            writer.save_figure(fig, filename)
+        """Save figure if io_save_figs is enabled in config."""
+        save_figure(fig, f"emg_{condition}", self.config, self.writer)
 
     def plot_all(self, epochs: mne.Epochs):
         """Plot EMG evoked for each condition."""

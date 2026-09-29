@@ -19,9 +19,8 @@ class ArtifactRemover:
         mode: str | None = None,
     ) -> Union[mne.io.BaseRaw, mne.BaseEpochs]:
 
-        artifact_cfg = self.config.artifact
-        window = artifact_cfg.window_removal_artifact
-        mode = mode or artifact_cfg.mode_removal_artifact
+        window = self.config.artifact_window
+        mode = mode or self.config.artifact_mode
 
         if mode in self.MNE_MODES:
             return self._remove_with_mne(inst, window, mode)
@@ -53,7 +52,7 @@ class ArtifactRemover:
 
         if isinstance(inst, mne.io.BaseRaw):
             events, event_id = mne.events_from_annotations(inst)
-            tms_annotation = list(self.config.events.trigger_id.keys())[0]
+            tms_annotation = list(self.config.event_trigger_id.keys())[0]
             kwargs["events"] = events
             kwargs["event_id"] = event_id[tms_annotation]
         elif not isinstance(inst, mne.BaseEpochs):
@@ -66,7 +65,7 @@ class ArtifactRemover:
     # Custom cubic spline interpolation (Epochs and Raw)
     # ------------------------------------------------------------------ #
     def _get_n_anchor(self, sfreq: float) -> int:
-        anchor_ms = self.config.artifact.anchor_window_ms
+        anchor_ms = self.config.artifact_anchor_window_ms
         n_anchor = int(round(anchor_ms / 1000.0 * sfreq))
         if n_anchor < 2:
             raise ValueError(
@@ -121,7 +120,7 @@ class ArtifactRemover:
         n_anchor = self._get_n_anchor(sfreq)
 
         events, event_id = mne.events_from_annotations(raw_clean)
-        tms_annotation = list(self.config.events.trigger_id.keys())[0]
+        tms_annotation = list(self.config.event_trigger_id.keys())[0]
         if tms_annotation not in event_id:
             raise KeyError(
                 f"Annotation '{tms_annotation}' not found in raw. "

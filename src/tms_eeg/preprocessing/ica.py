@@ -9,9 +9,7 @@ class EEGICA:
         
     def fit_ica(self, epochs: mne.Epochs) -> 'EEGICA':
         """Fit ICA decomposition to epoched data."""
-        ica_cfg = self.config.ica
-        
-        if not ica_cfg.run_ica:
+        if not self.config.ica_run:
             return self
             
         # Fit ICA using FastICA
@@ -37,7 +35,7 @@ class EEGICA:
         
     def plot_components(self, epochs: mne.Epochs, save_path: Path = None):
         """Plot ICA components for manual inspection."""
-        if self.ica is None or not self.config.ica.plot_components:
+        if self.ica is None or not self.config.ica_plot_components:
             return
             
         # Plot component sources

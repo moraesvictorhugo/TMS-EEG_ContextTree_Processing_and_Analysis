@@ -6,6 +6,7 @@ import mne
 import numpy as np
 
 from tms_eeg.config.settings import ProjectConfig
+from tms_eeg.paths import raw_dir
 
 
 @dataclass
@@ -17,7 +18,7 @@ class TextFileParser:
     @property
     def data_dir(self) -> Path:
         """Get the data directory for the subject."""
-        return Path(__file__).parents[3] / "data" / "raw" / f"{self.subject_id}_data"
+        return raw_dir(self.subject_id)
     
     def find_text_file(self) -> Optional[Path]:
         """Find the text file with trial conditions in the subject's data folder."""

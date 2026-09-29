@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing import Dict, Optional, List, Tuple
 from pathlib import Path
+from tms_eeg.io.writer import save_figure
 
 
 class MFPPlotter:
@@ -14,7 +15,7 @@ class MFPPlotter:
     def __init__(
         self,
         times: np.ndarray,
-        config=None,
+        config,
         writer=None,
     ):
         """
@@ -22,17 +23,14 @@ class MFPPlotter:
         ----------
         times : np.ndarray
             Time vector from epochs (in seconds).
-        config : ProjectConfig, optional
+        config : ProjectConfig
         writer : Writer, optional
         """
         self.times = times
         self.times_ms = times * 1e3
         self.config = config
         self.writer = writer
-        self.xlim = (
-            config.plots.tep_xlim if config else (-0.01, 0.2)
-        )
-        self.xlim_ms = (self.xlim[0] * 1e3, self.xlim[1] * 1e3)
+        self.xlim = config.plot_tep_xlim
 
     # ------------------------------------------------------------------ #
     #  Main API
@@ -48,7 +46,7 @@ class MFPPlotter:
         Plot GMFP and LMFP side by side for all conditions.
         One figure per condition with 2 subplots.
         """
-        if self.config and not self.config.plots.analysis_plots:
+        if not self.config.plot_analysis:
             return
             
         conditions = list(gmfp.keys())
@@ -85,7 +83,7 @@ class MFPPlotter:
         """
         Overlay all conditions on a single plot for GMFP or LMFP.
         """
-        if self.config and not self.config.plots.analysis_plots:
+        if not self.config.plot_analysis:
             return
             
         fig, ax = plt.subplots(figsize=(10, 5))
@@ -157,10 +155,5 @@ class MFPPlotter:
             )
 
     def _save_figure(self, fig, name: str, condition: str):
-        if self.config and self.config.io.save_figs and fig is not None:
-            if self.writer:
-                writer = self.writer
-            else:
-                from tms_eeg.io.writer import Writer
-                writer = Writer(self.config)
-            writer.save_figure(fig, f"mfp_{name}_{condition}")
+        """Save figure if io_save_figs is enabled in config."""
+        save_figure(fig, f"mfp_{name}_{condition}", self.config, self.writer)

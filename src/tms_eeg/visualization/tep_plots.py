@@ -4,13 +4,14 @@ import mne
 from typing import List, Optional, Dict
 import numpy as np
 import matplotlib.pyplot as plt
+from tms_eeg.io.writer import save_figure
 
 class TEPPlotter:
     """Plots TEP-related visualizations from epochs or evoked objects."""
 
     def __init__(
         self,
-        config=None,
+        config,
         xlim: tuple = None,
         topo_times: Optional[List[float]] = None,
         joint_times: Optional[List[float]] = None,
@@ -18,30 +19,15 @@ class TEPPlotter:
         writer=None,
     ):
         self.config = config
-        self.xlim = xlim or (config.plots.tep_xlim if config else (-0.01, 0.2))
-        self.topo_times = topo_times or (config.plots.tep_topo_times if config else [
-            0.005, 0.01, 0.02, 0.03, 0.04, 0.05,
-            0.06, 0.07, 0.08, 0.09, 0.1
-        ])
-        self.joint_times = joint_times or (config.plots.tep_joint_times if config else [
-            0.015, 0.03, 0.045, 0.06, 0.1, 0.18
-        ])
-        self.roi_picks = roi_picks or (config.plots.tep_roi_channels if config else [
-            'C3', 'FC1', 'CP1', 'C4', 'FC5', 'CP5'
-        ])
+        self.xlim = xlim or config.plot_tep_xlim
+        self.topo_times = topo_times or config.plot_tep_topo_times
+        self.joint_times = joint_times or config.plot_tep_joint_times
+        self.roi_picks = roi_picks or config.plot_tep_roi_channels
         self.writer = writer
 
     def _save_figure(self, fig, name: str, condition: str):
-        """Save figure if save_figs is enabled in config."""
-        if self.config and self.config.io.save_figs and fig is not None:
-            if self.writer:
-                writer = self.writer
-            else:
-                from tms_eeg.io.writer import Writer
-                writer = Writer(self.config)
-            
-            filename = f"tep_{name}_{condition}"
-            writer.save_figure(fig, filename)
+        """Save figure if io_save_figs is enabled in config."""
+        save_figure(fig, f"tep_{name}_{condition}", self.config, self.writer)
 
     def plot_evoked_by_symbol(
         self,
@@ -64,13 +50,13 @@ class TEPPlotter:
         ylim : tuple, optional
             Limites do eixo Y em µV. Default: None (autoescala).
         """
-        if self.config and not self.config.plots.analysis_plots:
+        if not self.config.plot_analysis:
             return
 
         picks = picks or self.roi_picks
         xlim_ms = tuple(v * 1e3 for v in (xlim or self.xlim))
 
-        event_to_symbol = self.config.analysis.event_to_symbol  # {1: 0, 2: 1, 3: 2}
+        event_to_symbol = self.config.analysis_event_to_symbol  # {1: 0, 2: 1, 3: 2}
 
         # Mapa inverso: event_id -> nome da condição (apenas dos eids relevantes)
         eid_to_cond = {v: k for k, v in epochs.event_id.items()}
@@ -131,7 +117,7 @@ class TEPPlotter:
         evokeds: Dict[str, mne.Evoked],
         xlim: tuple = None,
     ):
-        if self.config and not self.config.plots.analysis_plots:
+        if not self.config.plot_analysis:
             return
             
         xlim = xlim or self.xlim
@@ -181,7 +167,7 @@ class TEPPlotter:
         picks : list, optional
             Canais a plotar. Default: roi_picks do config.
         """
-        if self.config and not self.config.plots.analysis_plots:
+        if not self.config.plot_analysis:
             return
             
         contexts = contexts or ["ctx_01", "ctx_11", "ctx_21"]
@@ -287,7 +273,7 @@ class TEPPlotter:
         picks : list, optional
             Canais ROI. Default: roi_picks do config.
         """
-        if self.config and not self.config.plots.analysis_plots:
+        if not self.config.plot_analysis:
             return
             
         contexts = contexts or list(context_epochs.keys())

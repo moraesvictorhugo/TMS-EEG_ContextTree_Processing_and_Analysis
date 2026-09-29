@@ -94,13 +94,13 @@ class GroupPlotter:
         fig.tight_layout()
 
         # --- Salvar ou exibir ---
-        if self.config.io.save_figs:
+        if self.config.io_save_figs:
             fname = (
                 f"boxplot_{groupby}_{channel}_{component}_{metric}"
-                f".{self.config.plots.figure_format}"
+                f".{self.config.plot_format}"
             )
             filepath = self.output_dir / fname
-            fig.savefig(filepath, dpi=self.config.plots.figure_dpi, bbox_inches="tight")
+            fig.savefig(filepath, dpi=self.config.plot_dpi, bbox_inches="tight")
             print(f"[OK] Salvo: {filepath}")
         else:
             plt.show()
@@ -149,10 +149,10 @@ class GroupPlotter:
             fig.tight_layout()
 
             # --- Salvar ou exibir (controlado pelo config) ---
-            if self.config.io.save_figs:
-                fname = f"p30_amplitude_by_{analysis}.{self.config.plots.figure_format}"
+            if self.config.io_save_figs:
+                fname = f"p30_amplitude_by_{analysis}.{self.config.plot_format}"
                 filepath = self.output_dir / fname
-                fig.savefig(filepath, dpi=self.config.plots.figure_dpi, bbox_inches="tight")
+                fig.savefig(filepath, dpi=self.config.plot_dpi, bbox_inches="tight")
                 print(f"[OK] Salvo: {filepath}")
             else:
                 plt.show()

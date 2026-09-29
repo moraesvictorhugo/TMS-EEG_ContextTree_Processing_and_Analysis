@@ -1,20 +1,9 @@
-import mne
-from tms_eeg.config.settings import ProjectConfig
+def downsample(epochs, freq: float):
+    """Downsample epoched EEG data to `freq` Hz."""
+    return epochs.copy().resample(freq)
 
-class Downsampler:
-    def __init__(self, config: ProjectConfig):
-        self.config = config
 
-    def downsample(self, epochs) -> 'mne.Epochs':
-        """Downsample epoched EEG data."""
-        resampled = epochs.copy().resample(self.config.epochs.downsample_freq)
-        
-        return resampled
-
-    def downsample_emg_channels(self, epochs) -> 'mne.Epochs':
-        """Extract EMG channels and downsample them to the configured EMG frequency."""
-        # Extract only EMG channels
-        emg_epochs = epochs.copy().pick('emg')
-        # Downsample at EMG frequency
-        resampled = emg_epochs.resample(self.config.epochs.emg_downsample_freq)
-        return resampled
+def downsample_emg_channels(epochs, freq: float):
+    """Extract EMG channels and downsample them to `freq` Hz."""
+    emg_epochs = epochs.copy().pick('emg')
+    return emg_epochs.resample(freq)

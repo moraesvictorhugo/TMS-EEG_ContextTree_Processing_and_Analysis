@@ -8,6 +8,8 @@ from typing import Optional
 import numpy as np
 from scipy.io import savemat
 
+from tms_eeg import paths
+
 
 class Writer:
     """Class for saving EEG and EMG data (raw, epochs, evoked) to the processed directory."""
@@ -33,7 +35,7 @@ class Writer:
         Path
             Path to the processed directory for this subject
         """
-        processed_dir = Path("data/processed") / self.subject_id
+        processed_dir = paths.processed_dir(self.subject_id)
         processed_dir.mkdir(parents=True, exist_ok=True)
         return processed_dir
     
@@ -69,7 +71,7 @@ class Writer:
             Subfolder name within processed directory (default: 'processed')
         """
         # Check if export is enabled in configuration
-        if not self.config.io.export_data:
+        if not self.config.io_export_data:
             print("Export skipped: export_data is set to False in configuration")
             return
             
@@ -119,14 +121,14 @@ class Writer:
         dpi : int
             Resolution (default: from config)
         """
-        if not self.config.io.export_data:
+        if not self.config.io_export_data:
             print("Export skipped: export_data is set to False in configuration")
             return
         
         # Use config defaults if not provided
-        subfolder = subfolder or (self.config.plots.figure_subfolder if hasattr(self.config, 'plots') and hasattr(self.config.plots, 'figure_subfolder') else "figures")
-        fmt = fmt or (self.config.plots.figure_format if hasattr(self.config, 'plots') and hasattr(self.config.plots, 'figure_format') else "png")
-        dpi = dpi or (self.config.plots.figure_dpi if hasattr(self.config, 'plots') and hasattr(self.config.plots, 'figure_dpi') else 300)
+        subfolder = subfolder or self.config.plot_subfolder
+        fmt = fmt or self.config.plot_format
+        dpi = dpi or self.config.plot_dpi
         
         try:
             figures_dir = self._create_figures_dir(subfolder)
@@ -150,7 +152,7 @@ class Writer:
             Subfolder name within processed directory (default: 'emg_processed')
         """
         # Check if export is enabled in configuration
-        if not self.config.io.export_data:
+        if not self.config.io_export_data:
             print("Export skipped: export_data is set to False in configuration")
             return
             
@@ -191,7 +193,7 @@ class Writer:
         window : tuple
             (tmin, tmax) in seconds to crop before exporting.
         """
-        if not self.config.io.export_data:
+        if not self.config.io_export_data:
             print("Export skipped: export_data is set to False in configuration")
             return
 
@@ -234,5 +236,16 @@ class Writer:
 
         savemat(full_path, mat_dict, do_compression=True, long_field_names=True)
         print(".mat file saved successfully!")
+
+
+def save_figure(fig: Figure, name: str, config, writer: Optional[Writer] = None) -> None:
+    """Save ``fig`` if ``config.io_save_figs`` is enabled — shared by all plotters.
+
+    Creates a :class:`Writer` on the fly unless one is provided.
+    """
+    if config is None or not config.io_save_figs or fig is None:
+        return
+    writer = writer or Writer(config)
+    writer.save_figure(fig, name)
 
 

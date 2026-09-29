@@ -1,8 +1,8 @@
-from pathlib import Path
-
+# reader.py
 import mne
 
 from tms_eeg.config.settings import ProjectConfig
+from tms_eeg.paths import processed_dir, raw_dir
 
 
 def load_data(config: ProjectConfig, data_type: str = "raw"):
@@ -15,16 +15,13 @@ def load_data(config: ProjectConfig, data_type: str = "raw"):
     Returns:
         mne.io.Raw | mne.Epochs: EEG data.
     """
-    base_dir = Path(__file__).parents[3]
-
     if data_type == "raw":
-        subject_dir = base_dir / "data" / "raw" / f"{config.subject_id}_data"
-        file_path = next(subject_dir.glob("*.bdf"))
+        file_path = next(raw_dir(config.subject_id).glob("*.bdf"))
         data = mne.io.read_raw_bdf(file_path, preload=True)
 
     elif data_type == "epochs":
-        subject_dir = base_dir / "data" / "processed" / f"{config.subject_id}" / "processed_full"
-        file_path = next(subject_dir.glob("*_epochs_processed.fif"))
+        epochs_dir = processed_dir(config.subject_id) / "processed_full"
+        file_path = next(epochs_dir.glob("*_epochs_processed.fif"))
         data = mne.read_epochs(file_path, preload=True)
 
     else:
@@ -32,14 +29,13 @@ def load_data(config: ProjectConfig, data_type: str = "raw"):
 
     return data
 
+
 def get_raw_path(config: ProjectConfig) -> str:
     """Retorna o caminho do arquivo .bdf raw original para o sujeito."""
-    base_dir = Path(__file__).parents[3]
-    raw_dir = base_dir / "data" / "raw" / f"{config.subject_id}_data"
-
-    bdf_files = list(raw_dir.glob("*.bdf"))
+    subject_raw_dir = raw_dir(config.subject_id)
+    bdf_files = list(subject_raw_dir.glob("*.bdf"))
     if not bdf_files:
         raise FileNotFoundError(
-            f"Nenhum .bdf encontrado em {raw_dir}"
+            f"Nenhum .bdf encontrado em {subject_raw_dir}"
         )
     return str(bdf_files[0])

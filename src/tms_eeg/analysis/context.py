@@ -11,8 +11,8 @@ class ContextMapper:
 
     def __init__(self, config: ProjectConfig):
         self.config = config
-        self.event_to_symbol = config.analysis.event_to_symbol
-        self.context_definitions = config.analysis.context_definitions
+        self.event_to_symbol = config.analysis_event_to_symbol
+        self.context_definitions = config.analysis_context_definitions
 
     def get_full_sequence(self, raw_path: str) -> np.ndarray:
         """
@@ -32,7 +32,7 @@ class ContextMapper:
             Índices posicionais de cada evento.
         """
         from tms_eeg.preprocessing.annotation_processor import AnnotationProcessor
-        from tms_eeg.preprocessing.epoching import EEGEpocher
+        from tms_eeg.preprocessing.epoching import find_events
 
         raw = mne.io.read_raw(raw_path, preload=False, verbose=False)
 
@@ -41,8 +41,7 @@ class ContextMapper:
         raw = processor.process_annotations(raw)
 
         # Usa o mesmo find_events para garantir consistência
-        epocher = EEGEpocher(self.config)
-        events, event_id = epocher.find_events(raw)
+        events, event_id = find_events(raw, self.config)
 
         symbols = np.array([
             self.event_to_symbol[code] for code in events[:, 2]

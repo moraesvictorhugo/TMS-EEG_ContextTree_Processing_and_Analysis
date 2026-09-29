@@ -3,44 +3,42 @@ from dataclasses import dataclass, field
 
 @dataclass
 class ProjectConfig:
-    """Configuração do projeto — plano, um único nível de acesso.
-
-    Campos agrupados por prefixos curtos (``io_``, ``epoch_``, ``plot_``...),
-    ex.: ``config.plot_dpi``, ``config.epoch_baseline``.
+    """All project's configs.
     """
 
-    # Identificação
+    # identification
     subject_id: str = ""
 
-    # Entrada/saída
+    # Input/Output
     io_export_data: bool = False
     io_save_figs: bool = False
 
-    # Eventos / triggers
+    # Events / triggers
     event_trigger_id: dict = field(default_factory=lambda: {'Stimulus A': 1})
     event_stimulus_to_8bit_mapping: dict = field(default_factory=lambda: {
         'Stimulus A': ['8bit 1', '8bit 2', '8bit 3'],
     })
 
-    # Remoção de artefato TMS
+    # Artfact Removing
     artifact_window: tuple = (-0.002, 0.015)
     artifact_mode: str = 'cubic'
     artifact_anchor_window_ms: float = 5.0
 
-    # Filtros
-    filter_eeg_bandpass: tuple = (None, 80)
+    # Filters
+    filter_eeg_1st_bandpass: tuple = (1, None)
+    filter_eeg_2nd_bandpass: tuple = (None, 80)
     filter_emg_bandpass: tuple = (20, 500)
     filter_notch: tuple = (60, 120, 180, 240, 300)
 
-    # Canais
+    # Channels
     ch_eeg_reference: str = 'average'
     ch_eog_label: str = 'EOG'
     ch_emg_label: str = 'EMG'
     ch_eeg_montage: str = 'standard_1020'
 
-    # Épocas
-    epoch_window: tuple = (-0.8, 0.8)
-    epoch_baseline: tuple = (-0.2, -0.01)
+    # Epochs
+    epoch_window: tuple = (-1.0, 1.0)
+    epoch_baseline: tuple = (-0.25, -0.1)
     epoch_downsample_freq: float = 1000.0
     epoch_emg_downsample_freq: float = 3000.0
 
@@ -48,7 +46,7 @@ class ProjectConfig:
     ica_run: bool = True
     ica_plot_components: bool = True
 
-    # Análise
+    # Analysis
     analysis_subjects: list = field(default_factory=lambda: [
         "V04", "V05", "V04", "V07", "V08", "V09"])
     analysis_channels_of_interest: list = field(default_factory=lambda: [
@@ -79,7 +77,7 @@ class ProjectConfig:
         "8bit3": 2,
     })
 
-    # Figuras
+    # Figures
     plot_format: str = "png"
     plot_dpi: int = 600
     plot_subfolder: str = "figures"

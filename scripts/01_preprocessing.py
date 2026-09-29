@@ -31,7 +31,9 @@ raw_data = load_data(config)
 
 # Set EOG and EMG channels and set montage
 raw_data.set_channel_types({
-    config.ch_eog_label: 'eog', config.ch_emg_label: 'emg'})
+    config.ch_eog_label: "eog",
+    config.ch_emg_label: "emg",
+})
 raw_data.set_montage(config.ch_eeg_montage)
 
 # Artifact removal
@@ -47,57 +49,33 @@ data_filtered.filter(l_freq=1, h_freq=None, fir_design='firwin')
 annotation_processor = AnnotationProcessor(config)
 data_filtered = annotation_processor.process_annotations(data_filtered)
 
-
-
-
-
-
-
-
-
-# Create epochs using standard pipeline          # Checar se faz a correção baseline de (-0,25, -0,1) s
-epochs_eeg = create_epochs(data_filtered, config)    # e detrend=1
-
-### Exemplo:
-
-epochs = mne.Epochs(
-    raw_data,
-    events=events_tms,
-    event_id=events_id_tms,
-    tmin=-0.8,
-    tmax=0.8,
-    baseline=(-0.25,-0.1),
-    preload=True,
-    detrend=1,
-)
+# Create eeg epochs using standard pipeline
+epochs_eeg = create_epochs(data_filtered, config)
 
 # Create epochs for EMG data
 raw_data_emg = raw_data.copy().pick("emg")
 epochs_emg = create_epochs(raw_data_emg, config)
-
-# # Baseline correction
-# epochs_eeg.apply_baseline(baseline=(-0.25, -0.01))    # ver se não faz diretamente em cima
 
 # Verify artfact duration
 tep_plotter = TEPPlotter(config)
 tep_plotter.plot_evoked_by_symbol(
     epochs_eeg,
     picks=["FC1", "FC5", "C3", "C4", "CP1", "CP5"],
-    xlim=(-0.01, 0.015),
-    ylim=(-30, 30)
+    xlim=(-0.01, 0.1),
+    ylim=(-60, 60)
 )
 
-###########################################################################
 
-# Artifact removal
-epochs_eeg = ArtifactRemover(config).remove_tms_artifact(epochs_eeg, mode='cubic')
 
-tep_plotter.plot_evoked_by_symbol(
-    epochs_eeg,
-    picks=["FC1", "FC5", "C3", "C4", "CP1", "CP5"],
-    xlim=(-0.01, 0.2),
-    ylim=(-30, 30)
-)
+
+
+
+
+
+
+
+
+
 
 # Remove bad channels (TP9, TP10, O1, O2, Iz)
 epochs_eeg.drop_channels(["TP9", "TP10", "O1", "O2", "Iz"])

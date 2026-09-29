@@ -85,6 +85,7 @@ def create_epochs(raw: mne.io.BaseRaw, config: ProjectConfig) -> mne.Epochs:
         preload=True,
         reject=None,
         flat=None,
+        detrend=1,
     )
 
 

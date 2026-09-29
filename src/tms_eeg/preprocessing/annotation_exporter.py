@@ -3,8 +3,8 @@ from typing import List, Tuple
 import numpy as np
 import mne
 
-from src.tms_eeg.io.writer import Writer
-from src.tms_eeg.config.settings import ProjectConfig
+from tms_eeg.io.writer import Writer
+from tms_eeg.config.settings import ProjectConfig
 
 
 class EpochAnnotationExporter:

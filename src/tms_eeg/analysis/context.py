@@ -1,7 +1,7 @@
 import mne
 import numpy as np
 from typing import Dict, List, Optional
-from src.tms_eeg.config.settings import ProjectConfig
+from tms_eeg.config.settings import ProjectConfig
 
 class ContextMapper:
     """
@@ -31,8 +31,8 @@ class ContextMapper:
         event_indices : np.ndarray, shape (n_events,)
             Índices posicionais de cada evento.
         """
-        from src.tms_eeg.preprocessing.annotation_processor import AnnotationProcessor
-        from src.tms_eeg.preprocessing.epoching import EEGEpocher
+        from tms_eeg.preprocessing.annotation_processor import AnnotationProcessor
+        from tms_eeg.preprocessing.epoching import EEGEpocher
 
         raw = mne.io.read_raw(raw_path, preload=False, verbose=False)
 

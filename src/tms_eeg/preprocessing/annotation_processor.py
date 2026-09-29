@@ -1,9 +1,11 @@
-import mne
-from pathlib import Path
 from dataclasses import dataclass
-from typing import List, Tuple, Optional
+from pathlib import Path
+from typing import List, Optional, Tuple
+
+import mne
 import numpy as np
-from src.tms_eeg.config.settings import ProjectConfig
+
+from tms_eeg.config.settings import ProjectConfig
 
 
 @dataclass

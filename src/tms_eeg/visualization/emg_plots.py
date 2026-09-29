@@ -19,7 +19,7 @@ class EMGPlotter:
             if self.writer:
                 writer = self.writer
             else:
-                from src.tms_eeg.io.writer import Writer
+                from tms_eeg.io.writer import Writer
                 writer = Writer(self.config)
             
             filename = f"emg_{condition}"

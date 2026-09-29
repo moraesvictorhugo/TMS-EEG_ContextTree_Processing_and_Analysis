@@ -1,20 +1,18 @@
+import mne
+from pytep import apply_sound, apply_sspsir
 from scipy.signal import detrend
-from pytep import apply_sspsir, apply_sound
 
-# Set backend
 from tms_eeg.config.environment import setup_plotting_backend
-
-# Imports
 from tms_eeg.config.settings import ProjectConfig
 from tms_eeg.io.reader import load_data
 from tms_eeg.io.writer import Writer
+from tms_eeg.preprocessing.annotation_exporter import EpochAnnotationExporter
 from tms_eeg.preprocessing.annotation_processor import AnnotationProcessor
 from tms_eeg.preprocessing.artifacts import ArtifactRemover
 from tms_eeg.preprocessing.downsampling import Downsampler
 from tms_eeg.preprocessing.epoching import EEGEpocher, EpochDropper
 from tms_eeg.preprocessing.filtering import Filter
 from tms_eeg.preprocessing.ica import EEGICA
-from tms_eeg.preprocessing.annotation_exporter import EpochAnnotationExporter
 from tms_eeg.visualization.tep_plots import TEPPlotter
 
 setup_plotting_backend()
@@ -35,7 +33,7 @@ Steps
     SSP-SIR with tweaked time-window identification and component rejection based on bandpower limits
     Low pass filter (80 Hz) and notch filter (58-62 Hz)
     Remove bad trials (noise)
-    Export .mat and .fif file 
+    Export .mat and .fif file
     
 """
 ##############################################################################
@@ -54,16 +52,36 @@ raw_data.set_montage(config.channels.eeg_montage)
 annotation_processor = AnnotationProcessor(config)
 raw_data = annotation_processor.process_annotations(raw_data)
 
+# Aplicar interpolação (usar apenas o stimulus A remanescente para interpolar)
+raw_data.plot()
+
+# FIltros (usar o que está no config)
+raw_data.notch_filter(freqs=[60, 120, 180, 240], fir_design='firwin')
+raw_data.filter(l_freq=1, h_freq=None, fir_design='firwin')  
+
 # Create epochs using standard EEGEpocher
-epocher = EEGEpocher(config)
-epochs_eeg = epocher.create_epochs(raw_data)
+epocher = EEGEpocher(config)                    # Checar se faz a correção baseline de (-0,25, -0,1) s
+epochs_eeg = epocher.create_epochs(raw_data)    # e detrend=1
+
+### Exemplo:
+
+epochs = mne.Epochs(
+    raw_data,
+    events=events_tms,
+    event_id=events_id_tms,
+    tmin=-0.8,
+    tmax=0.8,
+    baseline=(-0.25,-0.1),
+    preload=True,
+    detrend=1,
+)
 
 # Create epochs for EMG data
 raw_data_emg = raw_data.copy().pick("emg")
 epochs_emg = epocher.create_epochs(raw_data_emg)
 
-# Baseline correction
-epochs_eeg.apply_baseline(baseline=(-0.2, -0.01))
+# # Baseline correction
+# epochs_eeg.apply_baseline(baseline=(-0.25, -0.01))    # ver se não faz diretamente em cima
 
 # Verify artfact duration
 tep_plotter = TEPPlotter(config)
@@ -126,7 +144,7 @@ epochs_eeg.apply_baseline(baseline=(-0.2, -0.01))
 # Apply SOUND
 epochs_eeg = apply_sound(epochs_eeg, iter_num=5, lambda_val=0.1)
 
-# Set average reference
+# Set average reference            # checar se epochs_clean.set_eeg_reference("average", projection=False)
 epochs_eeg.set_eeg_reference(config.channels.eeg_reference)
 
 # Apply SSP-SIR
@@ -137,8 +155,7 @@ epochs_eeg = Downsampler(config).downsample(epochs_eeg)
 epochs_emg = Downsampler(config).downsample_emg_channels(epochs_emg)
 
 # Interpolate again
-import mne
-epochs_eeg = mne.preprocessing.fix_stim_artifact(epochs_eeg, mode='constant', tmin=-0.002, tmax=0.015, baseline=(-0.005, -0.002))
+epochs_eeg = mne.preprocessing.fix_stim_artifact(epochs_eeg, mode='constant', tmin=-0.005, tmax=0.010, baseline=(-0.050, -0.01))
 
 # Filter EEG data
 epochs_eeg_filtered = Filter(config).bp_filter(epochs_eeg, ch_type='eeg')

@@ -50,6 +50,10 @@ cd TMS-EEG_ContextTree_Processing_and_Analysis
 uv sync
 ```
 
+### VS Code
+
+Select the project interpreter once per machine: run **Python: Select Interpreter** and choose the `.venv` folder in the workspace. The `.venv` environment is auto-detected on both Linux and Windows.
+
 ### Using pip
 
 ```bash
@@ -184,7 +188,7 @@ The project uses a flexible configuration system based on Python dataclasses. Co
 ### Basic Configuration
 
 ```python
-from src.tms_eeg.config.settings import ProjectConfig
+from tms_eeg.config.settings import ProjectConfig
 
 # Create configuration for a specific subject
 config = ProjectConfig(subject_id="V07")
@@ -238,9 +242,9 @@ The preprocessing pipeline (`main_preprocessing.py`) handles:
 
 ```python
 # Example: Custom preprocessing
-from src.tms_eeg.config.settings import ProjectConfig
-from src.tms_eeg.preprocessing.epoching import EEGEpocher
-from src.tms_eeg.preprocessing.artifacts import ArtifactRemover
+from tms_eeg.config.settings import ProjectConfig
+from tms_eeg.preprocessing.epoching import EEGEpocher
+from tms_eeg.preprocessing.artifacts import ArtifactRemover
 
 config = ProjectConfig(subject_id="V07")
 # ... preprocessing steps as defined in main_preprocessing.py
@@ -257,9 +261,9 @@ The analysis pipeline (`main_analysis.py`) performs:
 
 ```python
 # Example: Custom analysis
-from src.tms_eeg.config.settings import ProjectConfig
-from src.tms_eeg.analysis.features import FeatureExtractor
-from src.tms_eeg.analysis.context import ContextMapper
+from tms_eeg.config.settings import ProjectConfig
+from tms_eeg.analysis.features import FeatureExtractor
+from tms_eeg.analysis.context import ContextMapper
 
 config = ProjectConfig(subject_id="V07")
 # ... analysis steps as defined in main_analysis.py

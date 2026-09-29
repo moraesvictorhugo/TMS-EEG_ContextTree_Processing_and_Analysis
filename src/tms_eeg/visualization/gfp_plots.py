@@ -161,6 +161,6 @@ class MFPPlotter:
             if self.writer:
                 writer = self.writer
             else:
-                from src.tms_eeg.io.writer import Writer
+                from tms_eeg.io.writer import Writer
                 writer = Writer(self.config)
             writer.save_figure(fig, f"mfp_{name}_{condition}")

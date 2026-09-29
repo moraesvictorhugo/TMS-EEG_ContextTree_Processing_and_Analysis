@@ -1,4 +1,4 @@
-from src.tms_eeg.config.settings import ProjectConfig
+from tms_eeg.config.settings import ProjectConfig
 import mne
 from pathlib import Path
 

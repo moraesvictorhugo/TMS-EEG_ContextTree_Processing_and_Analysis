@@ -1,7 +1,7 @@
 # reader.py
 from pathlib import Path
 import mne
-from src.tms_eeg.config.settings import ProjectConfig
+from tms_eeg.config.settings import ProjectConfig
 
 def load_data(config: ProjectConfig, data_type: str = "raw"):
     """Load EEG data from file.

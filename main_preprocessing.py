@@ -19,21 +19,7 @@ setup_plotting_backend()
 
 """
 Steps
-    Load data
-    Find events and create epochs
-    Baseline correction (-200 ms to -10 ms)
-    Remove TMS Artifact using baseline data (window: -2 - 10 ms) cubic interpolation using 5 ms pre/pos pulse
-    Remove bad channels (TP9, TP10, O1, O2, Iz)
-    Remove bad trials (noise and blinks)
-    Remove drifts without robust detrending
-    ICA to remove ocular artifacts
-    Baseline correction
-    SOUND (lambda = 0.1)
-    Rereference to average
-    SSP-SIR with tweaked time-window identification and component rejection based on bandpower limits
-    Low pass filter (80 Hz) and notch filter (58-62 Hz)
-    Remove bad trials (noise)
-    Export .mat and .fif file
+
     
 """
 ##############################################################################
@@ -48,20 +34,31 @@ raw_data.set_channel_types({
     config.channels.eog_label: 'eog', config.channels.emg_label: 'emg'})
 raw_data.set_montage(config.channels.eeg_montage)
 
+# Artifact removal
+raw_data = ArtifactRemover(config).remove_tms_artifact(raw_data, mode='cubic')
+
+# Notch Filter
+Filter = Filter(config)
+data_filtered = Filter.notch_filter(raw_data, "eeg", band=(58, 62), harmonics=3)
+
+# HighPass Filter
+data_filtered.filter(l_freq=1, h_freq=None, fir_design='firwin')
+
 # Process annotations to replace Stimulus A with condition labels
 annotation_processor = AnnotationProcessor(config)
-raw_data = annotation_processor.process_annotations(raw_data)
+data_filtered = annotation_processor.process_annotations(data_filtered)
 
-# Aplicar interpolação (usar apenas o stimulus A remanescente para interpolar)
-raw_data.plot()
 
-# FIltros (usar o que está no config)
-raw_data.notch_filter(freqs=[60, 120, 180, 240], fir_design='firwin')
-raw_data.filter(l_freq=1, h_freq=None, fir_design='firwin')  
+
+
+
+
+
+
 
 # Create epochs using standard EEGEpocher
 epocher = EEGEpocher(config)                    # Checar se faz a correção baseline de (-0,25, -0,1) s
-epochs_eeg = epocher.create_epochs(raw_data)    # e detrend=1
+epochs_eeg = epocher.create_epochs(data_filtered)    # e detrend=1
 
 ### Exemplo:
 

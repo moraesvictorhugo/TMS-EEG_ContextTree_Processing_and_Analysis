@@ -1,3 +1,8 @@
+from contextlib import _BaseExitStackAbstract
+from PIL.TiffTags import SIGNED_RATIONAL
+from sqlite3 import SQLITE_NOTFOUND
+from mne import channels
+from scipy.integrate._ivp.base import ConstantDenseOutput
 import mne
 from pytep import apply_sound, apply_sspsir
 from scipy.signal import detrend
@@ -66,13 +71,80 @@ tep_plotter.plot_evoked_by_symbol(
 )
 
 
+# Sequência Márcio
+Dropar bad channels
+Interpolação cúbica para remover artefato TMS
+Notch e Passa Altas
+Cria épocas
+Remove épocas
+Correção de detrend linear
+ICA e exclui componentes
+Corrige baseline
+Aplica SOUND
+Referência Média
+SSP-SIR
+Remove artefato com Constante
+Filtro Passa Baixas
+Exporta
 
 
 
 
+# Protocolo a seguir
+Interpolação cúbica para remover artefato TMS (-5 a +10 ms com âncora de 10 ms)
+Downsampling 5000 HZ
+Passa Altas (0.1 Hz)
+Cria épocas de -1000 a +1000 ms (detrend=1) # vou ser redundante com o detrend
+Remover os bad channels (sem interpolar ainda).
+Rejeitar as bad epochs.
+Aplicar a referência média.    # visual inspection of components is easier when ICA is applied to data in average reference because topography is more interpretable.
+Remover artefato com constante (de −5 a +10 ms)
+Cálculo dos rank com: # rank = mne.compute_rank(epochs, rank='info')['eeg']  32 - n_bads - 1 da ref média
+Rodar o ICA e remover componentes (com n_components = rank)
+Aplicar SOUND
+SSP-SIR
+Interpolar os canais removidos
+Aplicar a referência média
+Interpolação cúbica para remover artefato TMS (-5 a +10 ms com âncora de 10 ms)
+Notch e Filtro FIR passa baixa (notch 60, passa baixa de 80 Hz)
+epochs_clean.apply_baseline(baseline=(-0.300, -0.02)) # De -300 a -20 ms
+Resampling 500 Hz
+Recortar épocas de -800 a +800 ms
+Export
 
 
 
+
+Interpolação cúbica do artefato do TMS (−5 a +10 ms, âncora de 10 ms)
+Downsampling para 5000 Hz
+Notch em 60 Hz (padrão do MNE)
+Duas cópias dos dados contínuos:
+    A: passa-altas de 0,1 Hz (dados de análise)
+    B: passa-altas de 1 Hz (usada só para ajustar o ICA)
+Criação de épocas de −1000 a +1000 ms (detrend=1) em A e B, com os mesmos eventos # checar se está aplicando a correção de baseline
+Identificação dos bad channels e das bad epochs em A e remoção dos mesmos em B
+Referência média em A e B
+Substituição do artefato por constante (−5 a +10 ms) em A e B
+Cálculo do rank (32−nbads−1)
+Ajuste do ICA em B (n_components = rank)
+Aplicação da solução do ICA em A e remoção dos componentes
+SOUND
+SSP-SIR
+Interpolação dos canais removidos
+Referência média
+Interpolação cúbica do artefato do TMS (−5 a +10 ms, âncora de 10 ms)
+Passa-baixas FIR de 80 Hz
+Baseline de −300 a −20 ms
+Resampling para 500 Hz
+Recorte de −800 a +800 ms
+Export
+
+
+
+
+O ICA separa pior com derivas lentas. Oscilações abaixo de 1 Hz têm muita amplitude e mudam ao longo do registro. Elas dominam a decomposição e deixam os componentes misturados. Por isso a cópia de 1 Hz gera componentes mais limpos.
+Os dados que você analisa precisam manter o 0,1 Hz. Os TEPs têm componentes lentos (ex.: N100, P180). Um passa-altas de 1 Hz distorceria esses componentes nos dados finais.
+A solução do ICA vale para as duas versões dos dados. O ICA só aprende uma matriz de separação espacial, isto é, como os canais se combinam. Essa combinação é a mesma nas duas versões, porque o filtro não muda a posição das fontes no escalpo. Então você usa a cópia de 1 Hz só para aprender a matriz e remove os componentes nos dados de 0,1 Hz.
 
 
 

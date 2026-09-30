@@ -35,7 +35,79 @@ raw_data.set_channel_types({
 raw_data.set_montage(config.ch_eeg_montage)
 
 # 1. Cubic interpolation of the TMS artifact (−5 to +15 ms, 10 ms anchor)    -> definir qual será a duração
-raw_data = ArtifactRemover(config).remove_tms_artifact(raw_data, mode='cubic')
+# raw_data = ArtifactRemover(config).remove_tms_artifact(raw_data, mode='cubic')
+
+
+
+# Esta função ficou muito melhor, encapsular e usar ela. Em seguida, testar se assim os filtros não dão ringing.
+# A CubicSpline interpola o ruído: ela é obrigada a passar por cada amostra das âncoras. As derivadas nas bordas
+# do buraco saem desse ruído, e o único segmento cúbico que cobre o buraco de ~12 ms amplifica essas inclinações.
+# O resultado é overshoot.
+
+
+import numpy as np
+import mne
+
+
+
+def interp_tms_tesa_like(
+    raw: mne.io.BaseRaw,
+    tms_annotation: str,
+    window: tuple = (-0.002, 0.010),  # segundos, relativo ao pulso
+    anchor_ms: tuple = (2.0, 2.0),    # equivale ao [1 1] do tesa_interpdata
+    order: int = 3,
+    picks="eeg",
+) -> mne.io.BaseRaw:
+    """Interpolação polinomial (cúbica) ao estilo TESA, ajustada só nas âncoras."""
+    raw_out = raw.copy().load_data()
+    sfreq = raw_out.info["sfreq"]
+    tmin, tmax = window
+
+    events, event_id = mne.events_from_annotations(raw_out)
+    if tms_annotation not in event_id:
+        raise KeyError(f"'{tms_annotation}' não encontrado. Disponíveis: {list(event_id)}")
+    tms_events = events[events[:, 2] == event_id[tms_annotation]]
+
+    picks_idx = mne.io.pick._picks_to_idx(raw_out.info, picks)
+
+    s_start = int(np.ceil(tmin * sfreq))
+    s_end = int(np.ceil(tmax * sfreq))
+    n_pre = max(1, int(round(anchor_ms[0] * 1e-3 * sfreq)))
+    n_post = max(1, int(round(anchor_ms[1] * 1e-3 * sfreq)))
+    if n_pre + n_post < order + 1:
+        raise ValueError("Âncoras insuficientes para o grau do polinômio.")
+
+    data = raw_out._data
+    n_times = raw_out.n_times
+
+    for ev in tms_events[:, 0]:
+        c = ev - raw_out.first_samp
+        a, b = c + s_start, c + s_end            # região interpolada: [a, b)
+        pre = np.arange(a - n_pre, a)
+        post = np.arange(b, b + n_post)
+        if pre[0] < 0 or post[-1] >= n_times:
+            print(f"Evento {ev} ignorado: âncoras fora do registro.")
+            continue
+
+        anc = np.concatenate([pre, post])
+        tgt = np.arange(a, b)
+
+        t_anc = (anc - c) * 1e3 / sfreq          # ms relativo ao pulso
+        t_tgt = (tgt - c) * 1e3 / sfreq
+
+        y = data[np.ix_(picks_idx, anc)].T       # (n_anc, n_ch)
+        p = np.polyfit(t_anc, y, order)
+        data[np.ix_(picks_idx, tgt)] = (np.vander(t_tgt, order + 1) @ p).T
+
+    return raw_out
+
+
+
+
+raw_tesa = interp_tms_tesa_like(raw_data, "Stimulus A", window=(-0.002, 0.010))
+
+
+
 
 # 2. Downsampling to 5000 Hz  -> Pode ser removido daqui se necessário, mas pode tornar o processamento muito pesado
 raw_data = downsample(raw_data, config.raw_downsample_freq)
@@ -43,10 +115,16 @@ raw_data = downsample(raw_data, config.raw_downsample_freq)
 # 3. 60 Hz notch (MNE default)    -> Checar se os filtros vão gerar ringing. Colocar no fim será ruim aplicar o filtro sobre as épocas
 
 
+# IIR em épocas
+epochs.filter(l_freq=62, h_freq=58, method="iir",
+              iir_params=dict(order=4, ftype="butter"),
+              phase="zero")
 
 
-
-
+# IIR em raw
+raw.notch_filter(60, method="iir",
+                 iir_params=dict(order=4, ftype="butter"),
+                 notch_widths=4, phase="zero")
 
 
 

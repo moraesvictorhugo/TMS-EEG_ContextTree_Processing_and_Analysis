@@ -1,5 +1,6 @@
 import mne
 import numpy as np
+from mne._fiff.pick import _picks_to_idx
 
 
 def bandpass(inst, band, ch_type: str):
@@ -32,13 +33,23 @@ def _notch_params(sfreq, notch_freqs, band=None, harmonics=1):
                       for h in range(1, harmonics + 1) if f * h < nyq])
     return freqs, width
 
+def notch_filter(inst, notch_freqs, ch_type: str | list[str] | None = None,
+                 band=None, harmonics=1):
+    """Notch FIR (zero-phase) via MNE em Raw, Epochs ou Evoked.
 
-def notch_filter(inst, notch_freqs, ch_type: str = "eeg", band=None, harmonics=1):
-    """Notch FIR (zero-phase) via MNE em Raw, Epochs ou Evoked."""
+    ch_type=None filtra todos os canais de dados. Também aceita
+    'eeg', 'emg', ['eeg', 'emg'], nomes ou índices de canais.
+    """
     inst = inst.copy().load_data() if hasattr(inst, "load_data") else inst.copy()
     freqs, width = _notch_params(inst.info["sfreq"], notch_freqs, band, harmonics)
-
     if freqs.size == 0:
+        return inst
+
+    picks = _picks_to_idx(
+        inst.info, ch_type if ch_type is not None else "data",
+        exclude=(), allow_empty=True,
+    )
+    if len(picks) == 0:
         return inst
 
     kwargs = {
@@ -51,23 +62,17 @@ def notch_filter(inst, notch_freqs, ch_type: str = "eeg", band=None, harmonics=1
     }
 
     if isinstance(inst, mne.io.BaseRaw):
-        return inst.notch_filter(picks=ch_type, **kwargs)
+        return inst.notch_filter(picks=picks, **kwargs)
 
     # Epochs / Evoked: não têm .notch_filter()
-    picks = mne.pick_types(inst.info, meg=False, ref_meg=False, **{ch_type: True})
-    if len(picks) == 0:
-        return inst
-
-    if isinstance(inst, mne.BaseEpochs):
-        data: np.ndarray = inst.get_data(copy=True)
-    else:
-        data = np.asarray(inst.data)
+    is_epochs = isinstance(inst, mne.BaseEpochs)
+    data = inst.get_data(copy=True) if is_epochs else np.asarray(inst.data)
 
     data[..., picks, :] = mne.filter.notch_filter(
         data[..., picks, :], Fs=inst.info["sfreq"], **kwargs
     )
 
-    if isinstance(inst, mne.BaseEpochs):
+    if is_epochs:
         inst._data = data
     else:
         inst.data = data

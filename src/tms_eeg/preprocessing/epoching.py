@@ -70,10 +70,18 @@ def find_events(raw: mne.io.BaseRaw, config: ProjectConfig) -> tuple[np.ndarray,
         f"Raw annotations found: {raw_descriptions}"
     )
 
-
-def create_epochs(raw: mne.io.BaseRaw, config: ProjectConfig) -> mne.Epochs:
+def create_epochs(
+    raw: mne.io.BaseRaw,
+    config: ProjectConfig,
+    modality: str = "eeg",
+) -> mne.Epochs:
     """Create epochs from raw data using the configured window/baseline."""
     events, event_id = find_events(raw, config)
+
+    if modality == "emg":
+        baseline, detrend = config.epoch_emg_baseline, config.epoch_emg_detrend
+    else:
+        baseline, detrend = config.epoch_eeg_baseline, config.epoch_eeg_detrend
 
     return mne.Epochs(
         raw,
@@ -81,12 +89,13 @@ def create_epochs(raw: mne.io.BaseRaw, config: ProjectConfig) -> mne.Epochs:
         event_id=event_id,
         tmin=config.epoch_window[0],
         tmax=config.epoch_window[1],
-        baseline=config.epoch_baseline,
+        baseline=baseline,
         preload=True,
         reject=None,
         flat=None,
-        detrend=1,
+        detrend=detrend,
     )
+
 
 
 def drop_from_json(epochs: mne.Epochs, json_path: str, subject_id: str) -> mne.Epochs:

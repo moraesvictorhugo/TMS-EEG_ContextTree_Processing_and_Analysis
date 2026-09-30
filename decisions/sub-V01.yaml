@@ -1,7 +1,7 @@
 # decisions/sub-01.yaml
 bad_channels: [XX, XX]
-ica_exclude: [X, X]
 bad_epochs: [X, X]
+ica_exclude: [X, X]
 notes: >
   xxxxx
 reviewed: 2026-09-XX

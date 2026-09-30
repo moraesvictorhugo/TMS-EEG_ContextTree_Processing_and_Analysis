@@ -13,6 +13,9 @@ class ProjectConfig:
     io_export_data: bool = False
     io_save_figs: bool = False
 
+    # Raw
+    raw_downsample_freq: float = 5000.0
+
     # Events / triggers
     event_trigger_id: dict = field(default_factory=lambda: {'Stimulus A': 1})
     event_stimulus_to_8bit_mapping: dict = field(default_factory=lambda: {
@@ -20,15 +23,15 @@ class ProjectConfig:
     })
 
     # Artfact Removing
-    artifact_window: tuple = (-0.002, 0.015)
+    artifact_window: tuple = (-0.005, 0.015)
     artifact_mode: str = 'cubic'
-    artifact_anchor_window_ms: float = 5.0
+    artifact_anchor_window_ms: float = 10.0
 
     # Filters
     filter_eeg_1st_bandpass: tuple = (1, None)
     filter_eeg_2nd_bandpass: tuple = (None, 80)
     filter_emg_bandpass: tuple = (20, 500)
-    filter_notch: tuple = (60, 120, 180, 240, 300)
+    filter_notch: float = 60.0
 
     # Channels
     ch_eeg_reference: str = 'average'
@@ -38,9 +41,12 @@ class ProjectConfig:
 
     # Epochs
     epoch_window: tuple = (-1.0, 1.0)
-    epoch_baseline: tuple = (-0.25, -0.1)
-    epoch_downsample_freq: float = 1000.0
+    epoch_eeg_baseline: tuple = (-0.3, -0.02)
+    epoch_emg_baseline: tuple | None = None
+    epoch_eeg_downsample_freq: float = 1000.0
     epoch_emg_downsample_freq: float = 3000.0
+    epoch_eeg_detrend: int | None = 1
+    epoch_emg_detrend: int | None = None
 
     # ICA
     ica_run: bool = True

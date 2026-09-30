@@ -14,3 +14,11 @@ def raw_dir(subject_id: str) -> Path:
 def processed_dir(subject_id: str) -> Path:
     """Pasta de dados processados do sujeito (data/processed/<subject_id>)."""
     return PROJECT_ROOT / "data" / "processed" / subject_id
+
+DECISIONS_DIR = PROJECT_ROOT / "decisions"
+
+def decisions_file(subject_id: str) -> Path:
+    """Arquivo de decisões do sujeito (decisions/sub-<id>.yaml)."""
+    sid = str(subject_id).removeprefix("sub-")
+    return DECISIONS_DIR / f"sub-{sid}.yaml"
+

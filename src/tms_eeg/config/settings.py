@@ -23,15 +23,18 @@ class ProjectConfig:
     })
 
     # Artfact Removing
-    artifact_window: tuple = (-0.005, 0.015)
+    artifact_window: tuple = (-0.005, 0.010)
     artifact_mode: str = 'cubic'
-    artifact_anchor_window_ms: float = 10.0
+    artifact_anchor_window_ms: float = 1.0
 
     # Filters
     filter_eeg_1st_bandpass: tuple = (1, None)
     filter_eeg_2nd_bandpass: tuple = (None, 80)
     filter_emg_bandpass: tuple = (20, 500)
     filter_notch: float = 60.0
+    filter_method: str = 'iir'          # 'fir' ou 'iir'
+    filter_iir_order: int = 4           # TESA: ordem 4 + filtfilt
+    filter_notch_width: float = 4.0     # Hz (58–62 para 60 Hz)
 
     # Channels
     ch_eeg_reference: str = 'average'

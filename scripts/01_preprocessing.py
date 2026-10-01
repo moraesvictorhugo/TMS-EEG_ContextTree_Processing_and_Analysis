@@ -1,4 +1,3 @@
-import mne
 from pytep import apply_sound, apply_sspsir
 from scipy.signal import detrend
 
@@ -6,7 +5,7 @@ from tms_eeg.config.environment import setup_plotting_backend
 from tms_eeg.config.settings import ProjectConfig
 from tms_eeg.io.reader import load_data
 from tms_eeg.io.writer import Writer
-from tms_eeg.io.yaml_reader import load_decisions
+from tms_eeg.io.yaml_reader import load_bad_channels, load_decisions
 from tms_eeg.preprocessing.annotation_exporter import EpochAnnotationExporter
 from tms_eeg.preprocessing.annotation_processor import AnnotationProcessor
 from tms_eeg.preprocessing.artifacts import ArtifactRemover
@@ -34,117 +33,30 @@ raw_data.set_channel_types({
 })
 raw_data.set_montage(config.ch_eeg_montage)
 
-# 1. Cubic interpolation of the TMS artifact (−5 to +15 ms, 10 ms anchor)    -> definir qual será a duração
-# raw_data = ArtifactRemover(config).remove_tms_artifact(raw_data, mode='cubic')
+# 1. Cubic interpolation of the TMS artifact
+raw_data = ArtifactRemover(config).remove_tms_artifact(raw_data, mode="tesa")
 
-
-
-# Esta função ficou muito melhor, encapsular e usar ela. Em seguida, testar se assim os filtros não dão ringing.
-# A CubicSpline interpola o ruído: ela é obrigada a passar por cada amostra das âncoras. As derivadas nas bordas
-# do buraco saem desse ruído, e o único segmento cúbico que cobre o buraco de ~12 ms amplifica essas inclinações.
-# O resultado é overshoot.
-
-
-import numpy as np
-import mne
-
-
-
-def interp_tms_tesa_like(
-    raw: mne.io.BaseRaw,
-    tms_annotation: str,
-    window: tuple = (-0.002, 0.010),  # segundos, relativo ao pulso
-    anchor_ms: tuple = (2.0, 2.0),    # equivale ao [1 1] do tesa_interpdata
-    order: int = 3,
-    picks="eeg",
-) -> mne.io.BaseRaw:
-    """Interpolação polinomial (cúbica) ao estilo TESA, ajustada só nas âncoras."""
-    raw_out = raw.copy().load_data()
-    sfreq = raw_out.info["sfreq"]
-    tmin, tmax = window
-
-    events, event_id = mne.events_from_annotations(raw_out)
-    if tms_annotation not in event_id:
-        raise KeyError(f"'{tms_annotation}' não encontrado. Disponíveis: {list(event_id)}")
-    tms_events = events[events[:, 2] == event_id[tms_annotation]]
-
-    picks_idx = mne.io.pick._picks_to_idx(raw_out.info, picks)
-
-    s_start = int(np.ceil(tmin * sfreq))
-    s_end = int(np.ceil(tmax * sfreq))
-    n_pre = max(1, int(round(anchor_ms[0] * 1e-3 * sfreq)))
-    n_post = max(1, int(round(anchor_ms[1] * 1e-3 * sfreq)))
-    if n_pre + n_post < order + 1:
-        raise ValueError("Âncoras insuficientes para o grau do polinômio.")
-
-    data = raw_out._data
-    n_times = raw_out.n_times
-
-    for ev in tms_events[:, 0]:
-        c = ev - raw_out.first_samp
-        a, b = c + s_start, c + s_end            # região interpolada: [a, b)
-        pre = np.arange(a - n_pre, a)
-        post = np.arange(b, b + n_post)
-        if pre[0] < 0 or post[-1] >= n_times:
-            print(f"Evento {ev} ignorado: âncoras fora do registro.")
-            continue
-
-        anc = np.concatenate([pre, post])
-        tgt = np.arange(a, b)
-
-        t_anc = (anc - c) * 1e3 / sfreq          # ms relativo ao pulso
-        t_tgt = (tgt - c) * 1e3 / sfreq
-
-        y = data[np.ix_(picks_idx, anc)].T       # (n_anc, n_ch)
-        p = np.polyfit(t_anc, y, order)
-        data[np.ix_(picks_idx, tgt)] = (np.vander(t_tgt, order + 1) @ p).T
-
-    return raw_out
-
-
-
-
-raw_tesa = interp_tms_tesa_like(raw_data, "Stimulus A", window=(-0.002, 0.010))
-
-
-
-
-# 2. Downsampling to 5000 Hz  -> Pode ser removido daqui se necessário, mas pode tornar o processamento muito pesado
+# 2. Downsampling to 5000 Hz
 raw_data = downsample(raw_data, config.raw_downsample_freq)
 
-# 3. 60 Hz notch (MNE default)    -> Checar se os filtros vão gerar ringing. Colocar no fim será ruim aplicar o filtro sobre as épocas
-
-
-# IIR em épocas
-epochs.filter(l_freq=62, h_freq=58, method="iir",
-              iir_params=dict(order=4, ftype="butter"),
-              phase="zero")
-
-
-# IIR em raw
-raw.notch_filter(60, method="iir",
-                 iir_params=dict(order=4, ftype="butter"),
-                 notch_widths=4, phase="zero")
-
-
-
-
-
-# ----------    Ajustar o notch de forma a ser menos provável de induzir ringing
-data_filtered = notch_filter(raw_data, config.filter_notch)
-data_filtered = raw_data
-raw_data_emg = data_filtered.copy().pick("emg")
-
 # 4. Split into two copies: A with 0.1 Hz high-pass and B with 1 Hz high-pass
-data_filtered_A = raw_data.filter(l_freq=0.1, h_freq=None, fir_design='firwin')
-data_filtered_B = data_filtered.filter(l_freq=1, h_freq=None, fir_design='firwin')
+data_filtered_A = bandpass(
+    raw_data.copy(), band=(0.1, None), ch_type="eeg", method="iir"
+)
+data_filtered_B = bandpass(
+    raw_data.copy(), band=(1, None), ch_type="eeg", method="iir"
+)
 
 # 5. Process annotations and create Epochs from −1000 to +1000 ms
 annotation_processor = AnnotationProcessor(config)
 data_filtered_A = annotation_processor.process_annotations(data_filtered_A)
+data_filtered_B = annotation_processor.process_annotations(data_filtered_B)
 
 epochs_eeg = create_epochs(data_filtered_A, config)
-epochs_emg = create_epochs(raw_data_emg, config, modality="emg")
+epochs_ica = create_epochs(data_filtered_B, config)
+
+epochs_emg = create_epochs(data_filtered_A, config, modality="emg")
+epochs_emg.pick([config.ch_emg_label])
 
 # Check
 tep_plotter = TEPPlotter(config)
@@ -152,42 +64,102 @@ tep_plotter.plot_evoked_by_symbol(
     epochs_eeg,
     picks=["FC1", "C3", "C4"],
     xlim=(-0.02, 0.1),
-    ylim=(-60, 60)
+    ylim=(-20, 20)
 )
 
 epochs_eeg.plot() # -> save bad channels and epochs in decisions
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # 6. Mark bad channels and epochs
 decisions = load_decisions(config)
+
 epochs_eeg = apply_bad_channels(epochs_eeg, decisions)
 epochs_eeg = apply_bad_epochs(epochs_eeg, decisions)
 
+epochs_ica = apply_bad_channels(epochs_ica, decisions)
+epochs_ica = apply_bad_epochs(epochs_ica, decisions)
+
+# Garantir que as épocas correspondem antes do ajuste
+
+
+
+import numpy as np
+
+
+
+
+if not np.array_equal(epochs_eeg.events, epochs_ica.events):
+    raise ValueError("As épocas A e B não correspondem.")
+
 # 7. Average reference
 epochs_eeg.set_eeg_reference(config.ch_eeg_reference)
+epochs_ica.set_eeg_reference(config.ch_eeg_reference)
 
-# 8. Replacement of the artifact with a constant (−5 to +10 ms)
-epochs_eeg = mne.preprocessing.fix_stim_artifact(epochs_eeg, mode='constant', tmin=-0.005, tmax=0.015, baseline=(-0.050, -0.01))
-
-
-
-
-
-
-
-
-
-
-
-
-# 9. Rank calculation: $$32 - n_{bads} - 1$$
-
-#10 ICA fitting (`n_components = rank`)
+# Ajustar na versão de 1 Hz
 ica_processor = EEGICA(config)
-ica_processor.fit_ica(epochs_eeg)
-ica_processor.plot_components(epochs_eeg)
+ica_processor.fit_ica(epochs_ica)
+ica_processor.plot_components(epochs_ica)
 
-#11 Application of the ICA solution and component removal
-epochs_eeg = ica_processor.apply_ica(epochs_eeg, components_to_remove=[0])
+# Aplicar a solução na versão de 0,1 Hz
+epochs_eeg = ica_processor.apply_ica(
+    epochs_eeg,
+    components_to_remove=[0],
+)
+
+
+
+
+
+decisions = load_decisions(config)
+print("Decisões carregadas:", decisions)
+
+epochs_eeg = apply_bad_channels(epochs_eeg, decisions)
+print("A após canais:", epochs_eeg.info["bads"])
+
+epochs_ica = apply_bad_channels(epochs_ica, decisions)
+print("B após canais:", epochs_ica.info["bads"])
+
+epochs_eeg = apply_bad_epochs(epochs_eeg, decisions)
+print("A após épocas:", epochs_eeg.info["bads"])
+
+epochs_ica = apply_bad_epochs(epochs_ica, decisions)
+print("B após épocas:", epochs_ica.info["bads"])
+
+epochs_eeg.set_eeg_reference(config.ch_eeg_reference)
+epochs_ica.set_eeg_reference(config.ch_eeg_reference)
+print("Após referência:", epochs_eeg.info["bads"], epochs_ica.info["bads"])
+
+
+
+
+print("A:", len(epochs_eeg), "épocas")
+print("B:", len(epochs_ica), "épocas")
+print("Índices no YAML:", decisions["bad_epochs"])
+print("Canais ruins:", epochs_eeg.info["bads"], epochs_ica.info["bads"])
+
+
+
+
+
+
+
+
+
+
+
 
 #12 SOUND
 epochs_eeg = apply_sound(epochs_eeg, iter_num=5, lambda_val=0.1)
@@ -201,12 +173,22 @@ epochs_eeg.interpolate_bads(reset_bads=True)
 #15 Average reference
 epochs_eeg.set_eeg_reference(config.ch_eeg_reference)
 
-#16 Cubic interpolation of the TMS artifact (−5 to +10 ms)
+#16 Cubic interpolation of the TMS artifact (−5 to +12 ms) -> um pouco maior do que no anterior?
+raw_data = ArtifactRemover(config).remove_tms_artifact(raw_data, mode="tesa")
 
 #17 80 Hz FIR low-pass and EMG Filter
 epochs_eeg_filtered = bandpass(epochs_eeg, config.filter_eeg_bandpass, 'eeg')
 
 epochs_emg_filtered = bandpass(epochs_emg, config.filter_emg_bandpass, 'emg')
+
+
+# Notch aqui??
+epochs = bandpass(epochs, cfg.filter_eeg_1st_bandpass, "eeg",
+                  method=cfg.filter_method,
+                  iir_order=cfg.filter_iir_order)
+
+
+
 
 # 18. Baseline from −300 to −20 ms
 epochs_eeg.apply_baseline(baseline=config.epoch_baseline)

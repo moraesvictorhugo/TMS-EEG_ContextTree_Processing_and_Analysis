@@ -1,4 +1,4 @@
-# decisions/sub-00.yaml
+# decisions/sub-V00.yaml
 bad_channels: [F7, F3]
 bad_epochs: [2, 8, 15]
 ica_exclude: [X, X]

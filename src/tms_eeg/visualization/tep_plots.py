@@ -2,8 +2,8 @@
 
 import mne
 from typing import List, Optional, Dict
-import numpy as np
 import matplotlib.pyplot as plt
+from tms_eeg.analysis.features import mean_field_power
 from tms_eeg.io.writer import save_figure
 
 class TEPPlotter:
@@ -13,21 +13,13 @@ class TEPPlotter:
         self,
         config,
         xlim: tuple = None,
-        topo_times: Optional[List[float]] = None,
         joint_times: Optional[List[float]] = None,
         roi_picks: Optional[List[str]] = None,
-        writer=None,
     ):
         self.config = config
         self.xlim = xlim or config.plot_tep_xlim
-        self.topo_times = topo_times or config.plot_tep_topo_times
         self.joint_times = joint_times or config.plot_tep_joint_times
         self.roi_picks = roi_picks or config.plot_tep_roi_channels
-        self.writer = writer
-
-    def _save_figure(self, fig, name: str, condition: str):
-        """Save figure if io_save_figs is enabled in config."""
-        save_figure(fig, f"tep_{name}_{condition}", self.config, self.writer)
 
     def plot_evoked_by_symbol(
         self,
@@ -142,7 +134,7 @@ class TEPPlotter:
             ax.axvline(0, color="gray", linestyle="--", linewidth=0.5)
             fig.tight_layout()
 
-            self._save_figure(fig, f"mean_tep_{ch}", "all_conditions")
+            save_figure(fig, f"tep_mean_tep_{ch}_all_conditions", self.config)
             plt.show()
             plt.close(fig)
             
@@ -209,14 +201,14 @@ class TEPPlotter:
             ax.axhline(0, color="gray", ls="--", lw=0.5)
             ax.axvline(0, color="gray", ls="--", lw=0.5)
             fig.tight_layout()
-            self._save_figure(fig, f"ctx_compare_{ch}", "ctx_01_11_21")
+            save_figure(fig, f"tep_ctx_compare_{ch}_ctx_01_11_21", self.config)
             plt.show()
             plt.close(fig)
 
         # --- 2) GFP comparison ---
         fig, ax = plt.subplots(figsize=(9, 4))
         for i, (ctx, evk) in enumerate(evokeds.items()):
-            gfp = np.std(evk.data, axis=0)
+            gfp = mean_field_power(evk)
             n_ep = len(context_epochs[ctx])
             ax.plot(
                 evk.times * 1e3,
@@ -233,7 +225,7 @@ class TEPPlotter:
         ax.axhline(0, color="gray", ls="--", lw=0.5)
         ax.axvline(0, color="gray", ls="--", lw=0.5)
         fig.tight_layout()
-        self._save_figure(fig, "ctx_compare_gfp", "ctx_01_11_21")
+        save_figure(fig, "tep_ctx_compare_gfp_ctx_01_11_21", self.config)
         plt.show()
         plt.close(fig)
 
@@ -244,156 +236,4 @@ class TEPPlotter:
                 title=f"TEP — {ctx} (n={len(context_epochs[ctx])})",
                 ts_args=dict(xlim=xlim),
             )
-            self._save_figure(fig, f"ctx_joint_{ctx}", "ctx_01_11_21")
-            
-    def plot_context_temporal_comparison(
-        self,
-        context_epochs: Dict[str, mne.Epochs],
-        n_splits: int = 2,
-        split_labels: Optional[List[str]] = None,
-        contexts: Optional[List[str]] = None,
-        xlim: tuple = None,
-        picks: Optional[List[str]] = None,
-    ):
-        """
-        Compara TEPs de frações temporais (ex: 1ª vs 2ª metade) por contexto.
-
-        Parameters
-        ----------
-        context_epochs : dict
-            {context_name: mne.Epochs}.
-        n_splits : int
-            Número de divisões (2 = metades, 3 = terços, etc.).
-        split_labels : list[str], optional
-            Rótulos das frações. Default: ["1/N", "2/N", ...].
-        contexts : list, optional
-            Contextos a plotar. Default: todos disponíveis.
-        xlim : tuple, optional
-            Janela temporal em segundos.
-        picks : list, optional
-            Canais ROI. Default: roi_picks do config.
-        """
-        if not self.config.plot_analysis:
-            return
-            
-        contexts = contexts or list(context_epochs.keys())
-        xlim = xlim or self.xlim
-        xlim_ms = (xlim[0] * 1e3, xlim[1] * 1e3)
-        picks = picks or self.roi_picks
-
-        if split_labels is None:
-            split_labels = [f"{i+1}/{n_splits}" for i in range(n_splits)]
-        if len(split_labels) != n_splits:
-            raise ValueError("split_labels deve ter comprimento igual a n_splits.")
-
-        cmap = plt.colormaps["tab10"]
-
-        for ctx in contexts:
-            if ctx not in context_epochs:
-                print(f"⚠ Contexto '{ctx}' não encontrado, pulando.")
-                continue
-
-            epochs = context_epochs[ctx]
-            n_total = len(epochs)
-            if n_total < n_splits:
-                print(f"⚠ '{ctx}' tem apenas {n_total} epoch(s), impossível dividir em {n_splits}.")
-                continue
-
-            # --- Dividir epochs em N frações (ordem temporal preservada) ---
-            indices = np.array_split(np.arange(n_total), n_splits)
-            split_evokeds = []
-            split_counts = []
-            for idx in indices:
-                ep_split = epochs[idx]
-                split_evokeds.append(ep_split.average(picks="eeg"))
-                split_counts.append(len(idx))
-
-            tag = f"{ctx}_splits{n_splits}"
-
-            # --- 1) Overlay por canal ROI ---
-            for ch in picks:
-                fig, ax = plt.subplots(figsize=(9, 4))
-                for i, (evk, label, n_ep) in enumerate(
-                    zip(split_evokeds, split_labels, split_counts)
-                ):
-                    data = evk.copy().pick([ch]).data.squeeze()
-                    ax.plot(
-                        evk.times * 1e3,
-                        data * 1e6,
-                        label=f"{label} (n={n_ep})",
-                        color=cmap(i),
-                        linewidth=1.4,
-                    )
-                ax.set_xlim(xlim_ms)
-                ax.set_xlabel("Time (ms)")
-                ax.set_ylabel("Amplitude (µV)")
-                ax.set_title(f"Temporal Split — {ctx} — {ch}")
-                ax.legend(fontsize=9)
-                ax.axhline(0, color="gray", ls="--", lw=0.5)
-                ax.axvline(0, color="gray", ls="--", lw=0.5)
-                fig.tight_layout()
-                self._save_figure(fig, f"temporal_{ch}", tag)
-                plt.show()
-                plt.close(fig)
-
-            # --- 2) GMFP comparison ---
-            fig, ax = plt.subplots(figsize=(9, 4))
-            for i, (evk, label, n_ep) in enumerate(
-                zip(split_evokeds, split_labels, split_counts)
-            ):
-                gfp = np.std(evk.data, axis=0)
-                ax.plot(
-                    evk.times * 1e3,
-                    gfp * 1e6,
-                    label=f"{label} (n={n_ep})",
-                    color=cmap(i),
-                    linewidth=1.4,
-                )
-            ax.set_xlim(xlim_ms)
-            ax.set_xlabel("Time (ms)")
-            ax.set_ylabel("GMFP (µV)")
-            ax.set_title(f"GMFP — Temporal Split — {ctx}")
-            ax.legend(fontsize=9)
-            ax.axhline(0, color="gray", ls="--", lw=0.5)
-            ax.axvline(0, color="gray", ls="--", lw=0.5)
-            fig.tight_layout()
-            self._save_figure(fig, "temporal_gmfp", tag)
-            plt.show()
-            plt.close(fig)
-
-            # --- 3) LMFP comparison (canais ROI) ---
-            fig, ax = plt.subplots(figsize=(9, 4))
-            for i, (evk, label, n_ep) in enumerate(
-                zip(split_evokeds, split_labels, split_counts)
-            ):
-                evk_roi = evk.copy().pick(picks)
-                lmfp = np.std(evk_roi.data, axis=0)
-                ax.plot(
-                    evk.times * 1e3,
-                    lmfp * 1e6,
-                    label=f"{label} (n={n_ep})",
-                    color=cmap(i),
-                    linewidth=1.4,
-                )
-            ax.set_xlim(xlim_ms)
-            ax.set_xlabel("Time (ms)")
-            ax.set_ylabel("LMFP (µV)")
-            ax.set_title(f"LMFP ({', '.join(picks)}) — Temporal Split — {ctx}")
-            ax.legend(fontsize=9)
-            ax.axhline(0, color="gray", ls="--", lw=0.5)
-            ax.axvline(0, color="gray", ls="--", lw=0.5)
-            fig.tight_layout()
-            self._save_figure(fig, "temporal_lmfp", tag)
-            plt.show()
-            plt.close(fig)
-
-            # --- 4) Joint topomap por fração ---
-            for i, (evk, label, n_ep) in enumerate(
-                zip(split_evokeds, split_labels, split_counts)
-            ):
-                fig = evk.plot_joint(
-                    times=self.joint_times,
-                    title=f"{ctx} — {label} (n={n_ep})",
-                    ts_args=dict(xlim=xlim),
-                )
-                self._save_figure(fig, f"temporal_joint_{label.replace('/', 'of')}", tag)
+            save_figure(fig, f"tep_ctx_joint_{ctx}_ctx_01_11_21", self.config)

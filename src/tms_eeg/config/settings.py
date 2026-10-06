@@ -21,9 +21,6 @@ class ProjectConfig:
 
     # Events / triggers
     event_trigger_id: dict = field(default_factory=lambda: {'Stimulus A': 1})
-    event_stimulus_to_8bit_mapping: dict = field(default_factory=lambda: {
-        'Stimulus A': ['8bit 1', '8bit 2', '8bit 3'],
-    })
 
     # Artfact Removing
     artifact_window: tuple = (-0.005, 0.010)
@@ -79,15 +76,12 @@ class ProjectConfig:
         "ctx_11": [1, 1],
         "ctx_21": [2, 1],
     })
-    analysis_event_to_symbol: dict = field(default_factory=lambda: {
-        1: 0,
-        2: 1,
-        3: 2,
-    })
+    # Única fonte dos símbolos/labels 8-bit — event_stimulus_to_8bit_mapping
+    # e analysis_event_to_symbol são derivados em __post_init__.
     analysis_name_to_symbol: dict = field(default_factory=lambda: {
-        "8bit1": 0,
-        "8bit2": 1,
-        "8bit3": 2,
+        "8bit 1": 0,
+        "8bit 2": 1,
+        "8bit 3": 2,
     })
 
     # Figures
@@ -95,15 +89,23 @@ class ProjectConfig:
     plot_dpi: int = 600
     plot_subfolder: str = "figures"
     plot_tep_xlim: tuple = (-0.01, 0.2)
-    plot_tep_topo_times: list = field(default_factory=lambda: [
-        0.005, 0.01, 0.02, 0.03, 0.04, 0.05,
-        0.06, 0.07, 0.08, 0.09, 0.1
-    ])
     plot_tep_joint_times: list = field(default_factory=lambda: [
         0.015, 0.03, 0.045, 0.06, 0.1, 0.18
     ])
     plot_tep_roi_channels: list = field(default_factory=lambda: [
         'C3', 'FC1', 'CP1', 'C4', 'FC5', 'CP5'
     ])
-    plot_emg_xlim: tuple = (-0.01, 0.08)
     plot_analysis: bool = True
+
+    def __post_init__(self):
+        """Deriva os mapas restantes de ``analysis_name_to_symbol``."""
+        stimulus = next(iter(self.event_trigger_id))
+        labels = sorted(
+            self.analysis_name_to_symbol,
+            key=self.analysis_name_to_symbol.get,
+        )
+        self.event_stimulus_to_8bit_mapping = {stimulus: labels}
+        self.analysis_event_to_symbol = {
+            idx + 1: self.analysis_name_to_symbol[label]
+            for idx, label in enumerate(labels)
+        }

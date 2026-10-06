@@ -1,11 +1,8 @@
-import mne
-import os
-import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
 from pathlib import Path
-from typing import Optional
 
+import mne
 import numpy as np
+from matplotlib.figure import Figure
 from scipy.io import savemat
 
 from tms_eeg import paths
@@ -59,7 +56,12 @@ class Writer:
         """
         return f"{self.subject_id}_{base_name}_{suffix}{extension}"
     
-    def save_epochs(self, epochs: mne.Epochs, subfolder: str = "processed") -> None:
+    def save_epochs(
+        self,
+        epochs: mne.Epochs,
+        subfolder: str = "processed",
+        base_name: str = "epochs",
+    ) -> None:
         """
         Save processed epochs to the processed directory.
         
@@ -69,6 +71,8 @@ class Writer:
             Processed epochs object
         subfolder : str
             Subfolder name within processed directory (default: 'processed')
+        base_name : str
+            Base filename part ('epochs' or 'emg_epochs')
         """
         # Check if export is enabled in configuration
         if not self.config.io_export_data:
@@ -78,94 +82,17 @@ class Writer:
         processed_dir = self._create_processed_dir() / subfolder
         processed_dir.mkdir(exist_ok=True)
         
-        filename = self._get_filename("epochs", "processed")
+        filename = self._get_filename(base_name, "processed")
         full_path = processed_dir / filename
         
         print(f"Saving epochs to: {full_path}")
         epochs.save(full_path, overwrite=True)
         print(f"Epochs saved successfully!")
     
-    def _create_figures_dir(self, subfolder: str = "figures") -> Path:
-        """
-        Create the figures directory for this subject.
-        
-        Parameters
-        ----------
-        subfolder : str
-            Subfolder name (default: 'figures')
-            
-        Returns
-        -------
-        Path
-            Path to the figures directory
-        """
-        figures_dir = self._create_processed_dir() / subfolder
-        figures_dir.mkdir(exist_ok=True)
-        return figures_dir
-
-    def save_figure(self, fig: Figure, name: str, subfolder: str = None,
-                    fmt: str = None, dpi: int = None) -> None:
-        """
-        Save a single matplotlib figure.
-        
-        Parameters
-        ----------
-        fig : matplotlib.figure.Figure
-            Figure to save
-        name : str
-            Descriptive name for the file (e.g., 'butterfly_8bits_1')
-        subfolder : str
-            Subfolder within processed directory (default: from config)
-        fmt : str
-            Image format (default: from config)
-        dpi : int
-            Resolution (default: from config)
-        """
-        if not self.config.io_export_data:
-            print("Export skipped: export_data is set to False in configuration")
-            return
-        
-        # Use config defaults if not provided
-        subfolder = subfolder or self.config.plot_subfolder
-        fmt = fmt or self.config.plot_format
-        dpi = dpi or self.config.plot_dpi
-        
-        try:
-            figures_dir = self._create_figures_dir(subfolder)
-            filename = self._get_filename(name, "plot", extension=f".{fmt}")
-            full_path = figures_dir / filename
-            
-            fig.savefig(full_path, dpi=dpi, bbox_inches='tight')
-            print(f"Figure saved: {full_path}")
-        except Exception as e:
-            print(f"Error saving figure '{name}': {e}")
-
     def save_emg_epochs(self, epochs: mne.Epochs, subfolder: str = "emg_processed") -> None:
-        """
-        Save EMG epochs to the processed directory with preserved annotations.
-        
-        Parameters
-        ----------
-        epochs : mne.Epochs
-            EMG epochs object with annotations
-        subfolder : str
-            Subfolder name within processed directory (default: 'emg_processed')
-        """
-        # Check if export is enabled in configuration
-        if not self.config.io_export_data:
-            print("Export skipped: export_data is set to False in configuration")
-            return
-            
-        processed_dir = self._create_processed_dir() / subfolder
-        processed_dir.mkdir(exist_ok=True)
-        
-        filename = self._get_filename("emg_epochs", "processed")
-        full_path = processed_dir / filename
-        
-        print(f"Saving EMG epochs to: {full_path}")
-        epochs.save(full_path, overwrite=True)
-        print(f"EMG epochs saved successfully!")
-        
+        """Save EMG epochs to the processed directory with preserved annotations."""
+        self.save_epochs(epochs, subfolder=subfolder, base_name="emg_epochs")
+
     def save_epochs_to_mat(
         self,
         epochs: mne.Epochs,
@@ -238,14 +165,18 @@ class Writer:
         print(".mat file saved successfully!")
 
 
-def save_figure(fig: Figure, name: str, config, writer: Optional[Writer] = None) -> None:
-    """Save ``fig`` if ``config.io_save_figs`` is enabled — shared by all plotters.
-
-    Creates a :class:`Writer` on the fly unless one is provided.
-    """
+def save_figure(fig: Figure, name: str, config) -> None:
+    """Save ``fig`` se ``config.io_save_figs`` estiver habilitado —
+    único caminho de salvamento de figuras do projeto."""
     if config is None or not config.io_save_figs or fig is None:
         return
-    writer = writer or Writer(config)
-    writer.save_figure(fig, name)
 
+    figures_dir = paths.processed_dir(config.subject_id) / config.plot_subfolder
+    figures_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"{config.subject_id}_{name}_plot.{config.plot_format}"
 
+    try:
+        fig.savefig(figures_dir / filename, dpi=config.plot_dpi, bbox_inches="tight")
+        print(f"Figure saved: {figures_dir / filename}")
+    except Exception as e:
+        print(f"Error saving figure '{name}': {e}")

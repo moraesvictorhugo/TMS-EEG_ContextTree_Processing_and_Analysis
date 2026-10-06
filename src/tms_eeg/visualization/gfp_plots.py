@@ -16,7 +16,6 @@ class MFPPlotter:
         self,
         times: np.ndarray,
         config,
-        writer=None,
     ):
         """
         Parameters
@@ -24,12 +23,10 @@ class MFPPlotter:
         times : np.ndarray
             Time vector from epochs (in seconds).
         config : ProjectConfig
-        writer : Writer, optional
         """
         self.times = times
         self.times_ms = times * 1e3
         self.config = config
-        self.writer = writer
         self.xlim = config.plot_tep_xlim
 
     # ------------------------------------------------------------------ #
@@ -70,7 +67,7 @@ class MFPPlotter:
             )
 
             fig.tight_layout()
-            self._save_figure(fig, "gmfp_lmfp", cond)
+            save_figure(fig, f"mfp_gmfp_lmfp_{cond}", self.config)
             plt.show()
             plt.close(fig)
 
@@ -103,7 +100,7 @@ class MFPPlotter:
         ax.legend()
         fig.tight_layout()
 
-        self._save_figure(fig, f"{label.lower()}_overlay", "all_conditions")
+        save_figure(fig, f"mfp_{label.lower()}_overlay_all_conditions", self.config)
         plt.show()
         plt.close(fig)
 
@@ -153,7 +150,3 @@ class MFPPlotter:
                 fontsize=7, fontstyle="italic",
                 color=color * 0.7,  # slightly darker
             )
-
-    def _save_figure(self, fig, name: str, condition: str):
-        """Save figure if io_save_figs is enabled in config."""
-        save_figure(fig, f"mfp_{name}_{condition}", self.config, self.writer)

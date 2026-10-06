@@ -16,7 +16,7 @@ def load_data(config: ProjectConfig, data_type: str = "raw"):
         mne.io.Raw | mne.Epochs: EEG data.
     """
     if data_type == "raw":
-        file_path = next(raw_dir(config.subject_id).glob("*.bdf"))
+        file_path = get_raw_path(config)
         data = mne.io.read_raw_bdf(file_path, preload=True)
 
     elif data_type == "epochs":

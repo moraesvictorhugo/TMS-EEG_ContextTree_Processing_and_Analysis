@@ -4,6 +4,15 @@ import pandas as pd
 from typing import Dict, List, Tuple, Optional
 
 
+def mean_field_power(evoked: mne.Evoked) -> np.ndarray:
+    """Mean field power: desvio-padrão dos canais em cada ponto do tempo.
+
+    Único local de cálculo de GMFP/LMFP (std across channels) — usado por
+    :class:`FeatureExtractor` e pelos plotters de TEP.
+    """
+    return evoked.data.std(axis=0)
+
+
 class FeatureExtractor:
     """Extrai features de amplitude de epochs EEG."""
 
@@ -107,7 +116,7 @@ class FeatureExtractor:
         """
         evokeds_all = self._get_evokeds_all_eeg(conditions)
         return {
-            cond: evoked.data.std(axis=0)
+            cond: mean_field_power(evoked)
             for cond, evoked in evokeds_all.items()
         }
 
@@ -126,7 +135,7 @@ class FeatureExtractor:
         """
         evokeds_roi = self.get_evokeds(conditions=conditions, picks=self.channels)
         return {
-            cond: evoked.data.std(axis=0)
+            cond: mean_field_power(evoked)
             for cond, evoked in evokeds_roi.items()
         }
 

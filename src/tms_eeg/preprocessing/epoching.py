@@ -1,4 +1,3 @@
-import json
 import re
 
 import mne
@@ -95,12 +94,3 @@ def create_epochs(
         flat=None,
         detrend=detrend,
     )
-
-
-
-def drop_from_json(epochs: mne.Epochs, json_path: str, subject_id: str) -> mne.Epochs:
-    """Drop epochs by pre-identified indices for `subject_id`."""
-    with open(json_path) as f:
-        idx = json.load(f).get(subject_id, [])
-    epochs.drop(idx)
-    return epochs

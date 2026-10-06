@@ -11,7 +11,6 @@ Picks = Union[str, list, None]
 
 
 class ArtifactRemover:
-    MNE_MODES = {"linear", "window", "constant"}
     CUSTOM_MODES = {"cubic", "tesa"}
     _EXCLUDED_TYPES = {"stim"}
 
@@ -61,9 +60,6 @@ class ArtifactRemover:
         mode = mode or self.config.artifact_mode
         picks_idx = self._resolve_picks(inst.info, picks)
 
-        if mode in self.MNE_MODES:
-            return self._remove_with_mne(inst, window, mode, picks_idx)
-
         if mode == "tesa":
             if isinstance(inst, mne.io.BaseRaw):
                 return self.interp_tms_tesa_like(inst, picks_idx)
@@ -76,26 +72,9 @@ class ArtifactRemover:
                 return self._interpolate_cubic(inst, window, picks_idx)
             raise TypeError(f"Unsupported type: {type(inst).__name__}")
 
-        allowed = self.MNE_MODES | self.CUSTOM_MODES
-        raise ValueError(f"Unsupported mode '{mode}'. Choose from {sorted(allowed)}.")
-
-    # ------------------------------------------------------------------ #
-    # MNE-native modes (linear / window / constant)
-    # ------------------------------------------------------------------ #
-    def _remove_with_mne(self, inst, window: tuple, mode: str, picks_idx: np.ndarray):
-        inst_clean = inst.copy().load_data()
-        kwargs = dict(tmin=window[0], tmax=window[1], mode=mode, picks=picks_idx)
-
-        if isinstance(inst, mne.io.BaseRaw):
-            events, event_id = mne.events_from_annotations(inst)
-            tms_annotation = list(self.config.event_trigger_id.keys())[0]
-            kwargs["events"] = events
-            kwargs["event_id"] = event_id[tms_annotation]
-        elif not isinstance(inst, mne.BaseEpochs):
-            raise TypeError(f"Unsupported type: {type(inst)}")
-
-        mne.preprocessing.fix_stim_artifact(inst_clean, **kwargs)
-        return inst_clean
+        raise ValueError(
+            f"Unsupported mode '{mode}'. Choose from {sorted(self.CUSTOM_MODES)}."
+        )
 
     # ------------------------------------------------------------------ #
     # Custom cubic spline interpolation (Epochs and Raw)

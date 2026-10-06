@@ -1,12 +1,12 @@
-from typing import List, Tuple
 from pathlib import Path
+from typing import List, Tuple
 
-import numpy as np
 import mne
+import numpy as np
 
+from tms_eeg.config.settings import ProjectConfig
 from tms_eeg.io.writer import Writer
 from tms_eeg.io.yaml_reader import save_epochs_record
-from tms_eeg.config.settings import ProjectConfig
 
 
 class EpochAnnotationExporter:

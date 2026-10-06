@@ -5,3 +5,22 @@ ica_exclude: [0]
 notes: >
   Testing data for code
 reviewed: 2026-09-XX
+epochs_record:
+  - {index: 0, annotation: 8Bit 2}
+  - {index: 1, annotation: 8Bit 2}
+  - {index: 2, annotation: 8Bit 1}
+  - {index: 3, annotation: 8Bit 2}
+  - {index: 4, annotation: 8Bit 2}
+  - {index: 5, annotation: 8Bit 1}
+  - {index: 6, annotation: 8Bit 3}
+  - {index: 7, annotation: 8Bit 2}
+  - {index: 8, annotation: 8Bit 1}
+  - {index: 9, annotation: 8Bit 3}
+  - {index: 10, annotation: 8Bit 2}
+  - {index: 11, annotation: 8Bit 1}
+  - {index: 12, annotation: 8Bit 3}
+  - {index: 13, annotation: 8Bit 2}
+  - {index: 14, annotation: 8Bit 1}
+  - {index: 15, annotation: 8Bit 2}
+  - {index: 16, annotation: 8Bit 2}
+  - {index: 17, annotation: 8Bit 1}

@@ -5,7 +5,10 @@ from tms_eeg.config.settings import ProjectConfig
 from tms_eeg.io.reader import load_data
 from tms_eeg.io.writer import Writer
 from tms_eeg.io.yaml_reader import load_decisions
-from tms_eeg.preprocessing.annotation_exporter import EpochAnnotationExporter, export_epochs_to_decisions
+from tms_eeg.preprocessing.annotation_exporter import (
+    EpochAnnotationExporter,
+    export_epochs_to_decisions,
+)
 from tms_eeg.preprocessing.annotation_processor import AnnotationProcessor
 from tms_eeg.preprocessing.artifacts import ArtifactRemover
 from tms_eeg.preprocessing.cleaning import (

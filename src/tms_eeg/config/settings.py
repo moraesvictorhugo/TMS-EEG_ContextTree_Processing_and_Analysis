@@ -23,14 +23,14 @@ class ProjectConfig:
     event_trigger_id: dict = field(default_factory=lambda: {'Stimulus A': 1})
 
     # Artfact Removing
-    artifact_window: tuple = (-0.005, 0.010)
+    artifact_window: tuple = (-0.005, 0.012)
     second_artifact_window: tuple = (-0.005, 0.012)
     artifact_mode: str = 'cubic'
     artifact_anchor_window_ms: float = 1.0
 
     # Filters
-    filter_eeg_1st_bandpass: tuple = (1, None)
-    filter_eeg_2nd_bandpass: tuple = (None, 80)
+    filter_eeg_highpass: tuple = (1, None)
+    filter_eeg_lowpass: tuple = (None, 80)
     filter_emg_bandpass: tuple = (20, 500)
     filter_notch: float = 60.0
     filter_method: str = 'iir'          # 'fir' ou 'iir'

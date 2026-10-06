@@ -42,7 +42,7 @@ raw_data = ArtifactRemover(config).remove_tms_artifact(raw_data, mode="tesa")
 # 2. High-Pass filltering for ICA stability
 data_filtered = bandpass(
     raw_data,
-    band=config.filter_eeg_1st_bandpass,
+    band=config.filter_eeg_highpass,
     ch_type="eeg",
     method=config.filter_method,
     iir_order=config.filter_iir_order,
@@ -57,7 +57,7 @@ epochs_eeg = create_epochs(data_filtered, config)
 epochs_emg = create_epochs(data_filtered, config, modality="emg")
 epochs_emg.pick([config.ch_emg_label])
 
-# Save epoch index and annotation sequence to YAML
+# 4. Save epoch index and annotation sequence to YAML
 export_epochs_to_decisions(config, epochs_eeg)
 
 # Check
@@ -69,49 +69,45 @@ tep_plotter.plot_evoked_by_symbol(
     ylim=(-20, 20)
 )
 
-# 4. Mark bad channels and epochs in decisions
+# 5. Mark bad channels and epochs in YAML file
 epochs_eeg.plot()
 
-# 5. Remove bad channels and epochs and load ICA components to remove
+# 6. Remove bad channels and epochs and load ICA components to remove
 decisions = load_decisions(config)
-epochs_eeg = apply_bad_channels(epochs_eeg, decisions) # ver se está marcando como bad
+epochs_eeg = apply_bad_channels(epochs_eeg, decisions)
 epochs_eeg = apply_bad_epochs(epochs_eeg, decisions, config)
 
-# 6. Average reference (ignoring channels marked as bad)
+# 7. Average reference (ignoring channels marked as bad)
 epochs_eeg.set_eeg_reference(config.ch_eeg_reference)
 
-# Fit ICA and mark component to remove in decisions file
+# 8. Fit ICA and mark component to remove in decisions file
 ica_processor = EEGICA(config, decisions)
 ica_processor.fit_ica(epochs_eeg)
 ica_processor.plot_components(epochs_eeg)
 
-# 7. Remove ICA components (excluídas definidas em ica_exclude no YAML)
+# 9. Remove ICA components (based on YAML file)
 if ica_processor.ica is not None:
     apply_ica_exclude(ica_processor.ica, decisions)
 epochs_eeg = ica_processor.apply_ica(epochs_eeg)
 
-#12 SOUND
+# 10. SOUND
 epochs_eeg = apply_sound(epochs_eeg, iter_num=5, lambda_val=0.1)
 
-#13 SSP-SIR
+# 11. SSP-SIR
 epochs_eeg = apply_sspsir(epochs_eeg)
 
-#14 Interpolation of removed channels
+# 12. Interpolation of removed channels
 epochs_eeg.interpolate_bads(reset_bads=True)
 
-#15 Average reference
-epochs_eeg.set_eeg_reference(config.ch_eeg_reference)
-
-#16 Cubic interpolation of the TMS artifact (−5 to +12 ms) -> um pouco maior do que no anterior?
-# epochs_eeg = ArtifactRemover(config).remove_tms_artifact(epochs_eeg, mode="tesa", config = second_artifact_window)
-
-# 2. Downsampling to 5000 Hz
+# 13. Downsampling
 epochs_eeg = downsample(epochs_eeg, config.raw_downsample_freq)
+epochs_emg = downsample_emg_channels(
+    epochs_emg, config.epoch_emg_downsample_freq)
 
-#17 80 Hz FIR low-pass and EMG Filter
+# 14. EEG Low-pass and EMG Bandpass Filters
 epochs_eeg_filtered = bandpass(
     epochs_eeg,
-    band=config.filter_eeg_2nd_bandpass,
+    band=config.filter_eeg_lowpass,
     ch_type="eeg",
     method=config.filter_method,
     iir_order=config.filter_iir_order,
@@ -125,7 +121,7 @@ epochs_emg_filtered = bandpass(
     iir_order=config.filter_iir_order,
 )
 
-# Notch
+# 15. Notch Filter
 epochs_eeg_filtered = notch_filter(
     epochs_eeg_filtered,
     notch_freqs=config.filter_notch,
@@ -136,83 +132,56 @@ epochs_eeg_filtered = notch_filter(
     harmonics=1,
 )
 
-# 18. Baseline (−300 a −20 ms) já aplicada em create_epochs via config.epoch_eeg_baseline
-
-# 19. Resampling EEG e EMG
-epochs_eeg_filtered = downsample(
-    epochs_eeg_filtered, config.epoch_eeg_downsample_freq
+epochs_emg_filtered = notch_filter(
+    epochs_emg_filtered,
+    notch_freqs=config.filter_notch,
+    ch_type="emg",
+    method=config.filter_method,
+    width=config.filter_notch_width,
+    iir_order=config.filter_iir_order,
+    harmonics=1,
 )
-epochs_emg_filtered = downsample_emg_channels(
-    epochs_emg_filtered, config.epoch_emg_downsample_freq
-)
 
+# 16. Baseline correction ????
+# epochs_eeg_filtered.apply_baseline(config.epoch_eeg_baseline)
 
 # Check TEP quality
 tep_plotter = TEPPlotter(config)
 tep_plotter.plot_evoked_by_symbol(
     epochs_eeg_filtered,
-    picks=["FC1", "FC5", "C3", "C4", "CP1", "CP5"],
+    picks=["FC1", "C3", "C4"],
     xlim=(-0.05, 0.2),
     ylim=(-10,10)
 )
 
-# 20. Cropping to −800 to +800 ms (to remove edge effects)
-epochs_eeg_filtered_pre_and_post_stim = (
-    epochs_eeg_filtered.copy().crop(tmin=-0.05, tmax=0.4))
+# 17. Cropping to −800 to +800 ms (to remove edge effects)
+epochs_eeg_filtered = (
+    epochs_eeg_filtered.crop(tmin=-0.8, tmax=0.8))
 
-epochs_eeg_filtered_post_stim = (
-    epochs_eeg_filtered.copy().crop(tmin=0.015, tmax=0.2))
-
-# 21. Export   -> checar: o drop de epocas 
+# 18. Export
 exporter = EpochAnnotationExporter(config)
 writer = Writer(config)
 
-writer.save_epochs(epochs_eeg_filtered, 'processed_full')  # Full Epochs -> precisa de um objeto lá atrás de antes da remoção das epocas
+if mode == "tep":
+    writer.save_epochs(epochs_eeg_filtered, "processed_tep")
 
-# Pre and Pos Stim ---------------------------------------------------------
-_, eeg_annotations_prepost = exporter.extract_annotations(
-    epochs_eeg_filtered_pre_and_post_stim
-)   
+elif mode == "context_tree":
+    writer.save_epochs(epochs_eeg_filtered, "processed_context_tree")
 
-symbols_prepost = exporter.map_annotations_to_symbols(
-    eeg_annotations_prepost
-)
+    _, eeg_annotations_prepost = exporter.extract_annotations(
+        epochs_eeg_filtered
+    )
 
-exporter.export_to_mat(
-    writer,
-    epochs_eeg_filtered_pre_and_post_stim,
-    symbols_prepost,
-    subfolder="processed_pre_and_post"
-)
+    symbols_prepost = exporter.map_annotations_to_symbols(
+        eeg_annotations_prepost
+    )
 
-writer.save_epochs(
-    epochs_eeg_filtered_pre_and_post_stim,
-    'processed_pre_and_post'
-)
-
-
-# Pos Stim only ---------------------------------------------------------
-
-_, eeg_annotations_post = exporter.extract_annotations(
-    epochs_eeg_filtered_post_stim
-)
-
-symbols_post = exporter.map_annotations_to_symbols(
-    eeg_annotations_post
-)
-
-exporter.export_to_mat(
-    writer,
-    epochs_eeg_filtered_post_stim,
-    symbols_post,
-    subfolder="processed_post_only"
-)
-
-writer.save_epochs(
-    epochs_eeg_filtered_post_stim,
-    'processed_post_only'
-)
-
+    exporter.export_to_mat(
+        writer,
+        epochs_eeg_filtered,
+        symbols_prepost,
+        subfolder="tree_retrieving",
+    )
 
 # EMG ---------------------------------------------------------------------
 writer.save_emg_epochs(

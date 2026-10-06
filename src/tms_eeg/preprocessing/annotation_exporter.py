@@ -1,9 +1,11 @@
 from typing import List, Tuple
+from pathlib import Path
 
 import numpy as np
 import mne
 
 from tms_eeg.io.writer import Writer
+from tms_eeg.io.yaml_reader import save_epochs_record
 from tms_eeg.config.settings import ProjectConfig
 
 
@@ -97,3 +99,24 @@ class EpochAnnotationExporter:
             ``"processed"``).
         """
         writer.save_epochs_to_mat(epochs, symbol_sequence=symbols, subfolder=subfolder)
+
+
+def export_epochs_to_decisions(
+    config: ProjectConfig,
+    epochs: mne.Epochs,
+) -> Path:
+    """Persist the full epoch index/annotation sequence in the decisions YAML.
+
+    Deve ser chamado ANTES da remoção de épocas — registra em ``epochs_record``
+    o ``epochs.selection`` e o rótulo (anotação) de cada época.
+
+    Args:
+        config: Project configuration.
+        epochs: Epochs object (registro completo, sem drops).
+
+    Returns:
+        Path of the updated YAML file.
+    """
+    exporter = EpochAnnotationExporter(config)
+    indexes, annotations = exporter.extract_annotations(epochs)
+    return save_epochs_record(config, indexes, annotations)

@@ -1,5 +1,7 @@
 import mne
 
+from tms_eeg.config.settings import ProjectConfig
+
 
 def apply_bad_channels(inst, decisions: dict, drop: bool = False):
     """Mark (or drop) bad_channels on Raw/Epochs."""
@@ -13,8 +15,15 @@ def apply_bad_channels(inst, decisions: dict, drop: bool = False):
     return inst
 
 
-def apply_bad_epochs(epochs: mne.Epochs, decisions: dict) -> mne.Epochs:
-    """Drop bad_epochs (indices relative to freshly created epochs)."""
+def apply_bad_epochs(
+    epochs: mne.Epochs,
+    decisions: dict,
+    config: ProjectConfig,
+) -> mne.Epochs:
+    """Drop YAML-marked epochs only in TEP mode."""
+    if config.mode != "tep":
+        return epochs
+
     bad_eps = decisions.get("bad_epochs") or []
     if bad_eps:
         epochs.drop(bad_eps, reason="YAML")

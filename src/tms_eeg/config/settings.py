@@ -9,6 +9,9 @@ class ProjectConfig:
     # identification
     subject_id: str = ""
 
+    # mode (context_tree: without trial exclusion, tep: apply trial exclusion)
+    mode: str = 'tep'     # context_tree  or tep
+
     # Input/Output
     io_export_data: bool = False
     io_save_figs: bool = False
@@ -24,6 +27,7 @@ class ProjectConfig:
 
     # Artfact Removing
     artifact_window: tuple = (-0.005, 0.010)
+    second_artifact_window: tuple = (-0.005, 0.012)
     artifact_mode: str = 'cubic'
     artifact_anchor_window_ms: float = 1.0
 

@@ -24,6 +24,7 @@ setup_plotting_backend()
 
 # 0. Loading and setting up channels and montage
 config = ProjectConfig(subject_id="V00")
+mode = config.mode
 
 raw_data = load_data(config)
 
@@ -36,26 +37,18 @@ raw_data.set_montage(config.ch_eeg_montage)
 # 1. Cubic interpolation of the TMS artifact
 raw_data = ArtifactRemover(config).remove_tms_artifact(raw_data, mode="tesa")
 
-# 2. Downsampling to 5000 Hz
-raw_data = downsample(raw_data, config.raw_downsample_freq)
-
-# 4. Split into two copies: A with 0.1 Hz high-pass and B with 1 Hz high-pass
-data_filtered_A = bandpass(
-    raw_data.copy(), band=(0.1, None), ch_type="eeg", method="iir"
-)
-data_filtered_B = bandpass(
-    raw_data.copy(), band=(1, None), ch_type="eeg", method="iir"
+# 2. High-Pass filltering for ICA stability
+data_filtered = bandpass(
+    raw_data, band=(1, None), ch_type="eeg", method="iir"
 )
 
-# 5. Process annotations and create Epochs from −1000 to +1000 ms
+# 3. Process annotations and create Epochs from −1000 to +1000 ms
 annotation_processor = AnnotationProcessor(config)
-data_filtered_A = annotation_processor.process_annotations(data_filtered_A)
-data_filtered_B = annotation_processor.process_annotations(data_filtered_B)
+data_filtered = annotation_processor.process_annotations(data_filtered)
 
-epochs_eeg = create_epochs(data_filtered_A, config)
-epochs_ica = create_epochs(data_filtered_B, config)
+epochs_eeg = create_epochs(data_filtered, config)
 
-epochs_emg = create_epochs(data_filtered_A, config, modality="emg")
+epochs_emg = create_epochs(data_filtered, config, modality="emg")
 epochs_emg.pick([config.ch_emg_label])
 
 # Check
@@ -67,99 +60,25 @@ tep_plotter.plot_evoked_by_symbol(
     ylim=(-20, 20)
 )
 
-epochs_eeg.plot() # -> save bad channels and epochs in decisions
+# 4. Mark bad channels and epochs in decisions
+epochs_eeg.plot()
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# 6. Mark bad channels and epochs
+# 5. Remove bad channels and epochs and load ICA components to remove
 decisions = load_decisions(config)
+epochs_eeg = apply_bad_channels(epochs_eeg, decisions) # ver se está marcando como bad
+epochs_eeg = apply_bad_epochs(epochs_eeg, decisions, config)
 
-epochs_eeg = apply_bad_channels(epochs_eeg, decisions)
-epochs_eeg = apply_bad_epochs(epochs_eeg, decisions)
-
-epochs_ica = apply_bad_channels(epochs_ica, decisions)
-epochs_ica = apply_bad_epochs(epochs_ica, decisions)
-
-# Garantir que as épocas correspondem antes do ajuste
-
-
-
-import numpy as np
-
-
-
-
-if not np.array_equal(epochs_eeg.events, epochs_ica.events):
-    raise ValueError("As épocas A e B não correspondem.")
-
-# 7. Average reference
+# 6. Average reference (ignoring channels marked as bad)
 epochs_eeg.set_eeg_reference(config.ch_eeg_reference)
-epochs_ica.set_eeg_reference(config.ch_eeg_reference)
 
-# Ajustar na versão de 1 Hz
+# Fit ICA and mark component to remove in decisions file
 ica_processor = EEGICA(config)
-ica_processor.fit_ica(epochs_ica)
-ica_processor.plot_components(epochs_ica)
+ica_processor.fit_ica(epochs_eeg)
+ica_processor.plot_components(epochs_eeg)
 
-# Aplicar a solução na versão de 0,1 Hz
+# 7. Remove ICA components
 epochs_eeg = ica_processor.apply_ica(
-    epochs_eeg,
-    components_to_remove=[0],
-)
-
-
-
-
-
-decisions = load_decisions(config)
-print("Decisões carregadas:", decisions)
-
-epochs_eeg = apply_bad_channels(epochs_eeg, decisions)
-print("A após canais:", epochs_eeg.info["bads"])
-
-epochs_ica = apply_bad_channels(epochs_ica, decisions)
-print("B após canais:", epochs_ica.info["bads"])
-
-epochs_eeg = apply_bad_epochs(epochs_eeg, decisions)
-print("A após épocas:", epochs_eeg.info["bads"])
-
-epochs_ica = apply_bad_epochs(epochs_ica, decisions)
-print("B após épocas:", epochs_ica.info["bads"])
-
-epochs_eeg.set_eeg_reference(config.ch_eeg_reference)
-epochs_ica.set_eeg_reference(config.ch_eeg_reference)
-print("Após referência:", epochs_eeg.info["bads"], epochs_ica.info["bads"])
-
-
-
-
-print("A:", len(epochs_eeg), "épocas")
-print("B:", len(epochs_ica), "épocas")
-print("Índices no YAML:", decisions["bad_epochs"])
-print("Canais ruins:", epochs_eeg.info["bads"], epochs_ica.info["bads"])
-
-
-
-
-
-
-
-
-
-
-
+    epochs_eeg)
 
 #12 SOUND
 epochs_eeg = apply_sound(epochs_eeg, iter_num=5, lambda_val=0.1)
@@ -174,28 +93,37 @@ epochs_eeg.interpolate_bads(reset_bads=True)
 epochs_eeg.set_eeg_reference(config.ch_eeg_reference)
 
 #16 Cubic interpolation of the TMS artifact (−5 to +12 ms) -> um pouco maior do que no anterior?
-raw_data = ArtifactRemover(config).remove_tms_artifact(raw_data, mode="tesa")
+# epochs_eeg = ArtifactRemover(config).remove_tms_artifact(epochs_eeg, mode="tesa", config = second_artifact_window)
+
+# 2. Downsampling to 5000 Hz
+epochs_eeg = downsample(epochs_eeg, config.raw_downsample_freq)
 
 #17 80 Hz FIR low-pass and EMG Filter
-epochs_eeg_filtered = bandpass(epochs_eeg, config.filter_eeg_bandpass, 'eeg')
+epochs_eeg_filtered = bandpass(
+    epochs_eeg, band=(None, 80), ch_type="eeg", method="iir"
+)
 
-epochs_emg_filtered = bandpass(epochs_emg, config.filter_emg_bandpass, 'emg')
+epochs_emg_filtered = bandpass(
+    epochs_emg, band=(20, 500), ch_type="eeg", method="iir"
+)
 
-
-# Notch aqui??
-epochs = bandpass(epochs, cfg.filter_eeg_1st_bandpass, "eeg",
-                  method=cfg.filter_method,
-                  iir_order=cfg.filter_iir_order)
-
-
-
+# Notch
+epochs_eeg_filtered = notch_filter(
+    epochs_eeg,
+    notch_freqs=60,
+    ch_type="eeg",
+    method="iir",
+    width=4,
+    harmonics=1,
+)
 
 # 18. Baseline from −300 to −20 ms
-epochs_eeg.apply_baseline(baseline=config.epoch_baseline)
+epochs_eeg_filtered = epochs_eeg_filtered.apply_baseline((-0.5, -0.01))
 
 # 19. Resampling EEG to 500 Hz and EMG 3000 Hz
 epochs_eeg = downsample(epochs_eeg, config.epoch_eeg_downsample_freq)
 epochs_emg = downsample_emg_channels(epochs_emg, config.epoch_emg_downsample_freq)
+
 
 # Check TEP quality
 tep_plotter = TEPPlotter(config)
@@ -206,7 +134,7 @@ tep_plotter.plot_evoked_by_symbol(
     ylim=(-10,10)
 )
 
-# 20. Cropping to −800 to +800 ms
+# 20. Cropping to −800 to +800 ms (to remove edge effects)
 epochs_eeg_filtered_pre_and_post_stim = (
     epochs_eeg_filtered.copy().crop(tmin=-0.05, tmax=0.4))
 

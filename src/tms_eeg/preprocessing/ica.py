@@ -3,16 +3,16 @@ from pathlib import Path
 import mne
 
 from tms_eeg.config.settings import ProjectConfig
-from tms_eeg.config.decisions import load_bad_channels  # ajuste ao nome do seu módulo
+from tms_eeg.io.yaml_reader import load_bad_channels
 
 
 class EEGICA:
     def __init__(self, config: ProjectConfig):
         self.config = config
-        self.ica = None
+        self.ica: mne.preprocessing.ICA | None = None
 
     def calculate_rank(self, epochs: mne.Epochs) -> int:
-        """Calcula 32 - número de canais EEG ruins - 1 (referência média)."""
+        """Calculate 32 minus bad EEG channels minus one for average reference."""
         eeg_channels = {
             name
             for name, channel_type in zip(
@@ -23,7 +23,7 @@ class EEGICA:
 
         if len(eeg_channels) != 32:
             raise ValueError(
-                f"Esperados 32 canais EEG nas épocas; encontrados "
+                f"Expected 32 EEG channels in epochs; found "
                 f"{len(eeg_channels)}."
             )
 
@@ -31,24 +31,25 @@ class EEGICA:
         unknown = bad_channels - eeg_channels
         if unknown:
             raise ValueError(
-                f"Canais do YAML ausentes entre os canais EEG: {sorted(unknown)}"
+                f"Channels listed in the YAML file are missing from the EEG "
+                f"channels: {sorted(unknown)}"
             )
 
         other_bad_eeg = (set(epochs.info["bads"]) & eeg_channels) - bad_channels
         if other_bad_eeg:
             raise ValueError(
-                f"Canais EEG marcados como ruins, mas ausentes do YAML: "
+                f"EEG channels marked as bad but missing from the YAML file: "
                 f"{sorted(other_bad_eeg)}"
             )
 
         rank = 32 - len(bad_channels) - 1
         if rank < 1:
-            raise ValueError(f"Rank inválido: {rank}")
+            raise ValueError(f"Invalid rank: {rank}")
 
         return rank
 
     def fit_ica(self, epochs: mne.Epochs) -> "EEGICA":
-        """Ajusta a ICA aos canais EEG, excluindo os ruins do YAML."""
+        """Fit ICA to EEG channels, excluding bad channels listed in YAML."""
         if not self.config.ica_run:
             return self
 
@@ -67,28 +68,34 @@ class EEGICA:
         return self
 
     def apply_ica(
-        self, epochs: mne.Epochs, components_to_remove: list = None
+        self, epochs: mne.Epochs, components_to_remove: list[int] | None = None
     ) -> mne.Epochs:
-        """Aplica a ICA para remover artefatos das épocas."""
+        """Apply ICA artifact rejection to a copy of the epochs."""
         if self.ica is None:
             return epochs
 
-        self.ica.exclude = components_to_remove or []
+        if components_to_remove is not None:
+            self.ica.exclude = list(components_to_remove)
+
         return self.ica.apply(epochs.copy())
 
     def plot_components(
-        self, epochs: mne.Epochs, save_path: Path = None
-    ):
-        """Mostra componentes da ICA para inspeção manual."""
+        self,
+        epochs: mne.Epochs,
+        save_path: Path | None = None,
+    ) -> None:
+        """Display ICA components and optionally save their topographies."""
         if self.ica is None or not self.config.ica_plot_components:
             return
 
         self.ica.plot_sources(epochs, show_scrollbars=False)
-        self.ica.plot_components(inst=epochs)
+        figures = self.ica.plot_components(inst=epochs)
 
-        if save_path:
+        if save_path is not None:
             save_path.mkdir(parents=True, exist_ok=True)
-            self.ica.plot_components(
-                inst=epochs,
-                savefig=str(save_path / "ica_components.png"),
-            )
+            if not isinstance(figures, list):
+                figures = [figures]
+
+            for index, figure in enumerate(figures, start=1):
+                suffix = "" if index == 1 else f"_{index}"
+                figure.savefig(save_path / f"ica_components{suffix}.png")

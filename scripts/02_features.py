@@ -2,7 +2,6 @@
 
 from tms_eeg.config.settings import ProjectConfig
 from tms_eeg.io.reader import load_data, get_raw_path
-from tms_eeg.io.writer import Writer
 from tms_eeg.analysis.features import FeatureExtractor
 from tms_eeg.analysis.context import ContextMapper
 from tms_eeg.analysis.group import MetricsCollector
@@ -22,18 +21,17 @@ for subject_id in subjects:
     epochs = load_data(config, data_type="epochs")
 
     # ── Renomear condições ───────────────────────────────────────────
-    label_map = {"8bit 1": "0", "8bit 2": "1", "8bit 3": "2"}
+    label_map = {k.lower(): str(v) for k, v in config.analysis_name_to_symbol.items()}
     epochs.event_id = {label_map[k.lower()]: v for k, v in epochs.event_id.items()}
 
     # ── Shared objects ───────────────────────────────────────────────
-    writer = Writer(config)
     extractor = FeatureExtractor(
         epochs,
         config.analysis_channels_of_interest,
         config.analysis_time_windows,
     )
-    tep_plotter = TEPPlotter(config=config, writer=writer)
-    mfp_plotter = MFPPlotter(times=epochs.times, config=config, writer=writer)
+    tep_plotter = TEPPlotter(config=config)
+    mfp_plotter = MFPPlotter(times=epochs.times, config=config)
 
     # ================================================================ #
     #  PART 1 — ANÁLISE POR CONDIÇÃO (8Bit 1 / 2 / 3)

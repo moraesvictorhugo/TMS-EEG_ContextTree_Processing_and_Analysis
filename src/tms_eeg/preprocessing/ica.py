@@ -3,12 +3,12 @@ from pathlib import Path
 import mne
 
 from tms_eeg.config.settings import ProjectConfig
-from tms_eeg.io.yaml_reader import load_bad_channels
 
 
 class EEGICA:
-    def __init__(self, config: ProjectConfig):
+    def __init__(self, config: ProjectConfig, decisions: dict):
         self.config = config
+        self.decisions = decisions
         self.ica: mne.preprocessing.ICA | None = None
 
     def calculate_rank(self, epochs: mne.Epochs) -> int:
@@ -27,7 +27,7 @@ class EEGICA:
                 f"{len(eeg_channels)}."
             )
 
-        bad_channels = set(load_bad_channels(self.config))
+        bad_channels = set(self.decisions.get("bad_channels") or [])
         unknown = bad_channels - eeg_channels
         if unknown:
             raise ValueError(
@@ -56,7 +56,8 @@ class EEGICA:
         rank = self.calculate_rank(epochs)
         epochs_fit = epochs.copy()
         epochs_fit.info["bads"] = sorted(
-            set(epochs_fit.info["bads"]) | set(load_bad_channels(self.config))
+            set(epochs_fit.info["bads"])
+            | set(self.decisions.get("bad_channels") or [])
         )
 
         self.ica = mne.preprocessing.ICA(
@@ -67,15 +68,14 @@ class EEGICA:
         self.ica.fit(epochs_fit, picks="eeg")
         return self
 
-    def apply_ica(
-        self, epochs: mne.Epochs, components_to_remove: list[int] | None = None
-    ) -> mne.Epochs:
-        """Apply ICA artifact rejection to a copy of the epochs."""
+    def apply_ica(self, epochs: mne.Epochs) -> mne.Epochs:
+        """Apply ICA artifact rejection to a copy of the epochs.
+
+        As componentes a remover vêm de ``apply_ica_exclude``
+        (``ica_exclude`` no YAML de decisões).
+        """
         if self.ica is None:
             return epochs
-
-        if components_to_remove is not None:
-            self.ica.exclude = list(components_to_remove)
 
         return self.ica.apply(epochs.copy())
 

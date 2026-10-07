@@ -1,15 +1,16 @@
 """Main analysis pipeline for TMS-EEG data."""
 
-from tms_eeg.config.settings import ProjectConfig
-from tms_eeg.io.reader import load_data, get_raw_path
-from tms_eeg.analysis.features import FeatureExtractor
 from tms_eeg.analysis.context import ContextMapper
+from tms_eeg.analysis.features import FeatureExtractor
 from tms_eeg.analysis.group import MetricsCollector
-from tms_eeg.visualization.tep_plots import TEPPlotter
-from tms_eeg.visualization.gfp_plots import MFPPlotter
 
 # Set backend
 from tms_eeg.config.environment import setup_plotting_backend
+from tms_eeg.config.settings import ProjectConfig
+from tms_eeg.io.reader import get_raw_path, load_data
+from tms_eeg.visualization.gfp_plots import MFPPlotter
+from tms_eeg.visualization.tep_plots import TEPPlotter
+
 setup_plotting_backend()
 
 collector = MetricsCollector()
@@ -60,7 +61,7 @@ for subject_id in subjects:
     # ── Contexts comparison ──────────────────────────────────────────
     tep_plotter.plot_context_comparison(context_epochs)
 
-# ── Export to CSV if enabled ──
+# ── Export to CSV in long format if enabled ──
 database = collector.export_csv(
     output_path="data/group/database.csv",
     export_enabled=export_enabled,

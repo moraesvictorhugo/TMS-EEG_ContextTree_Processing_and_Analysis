@@ -159,32 +159,13 @@ epochs_eeg_filtered = (
     epochs_eeg_filtered.crop(tmin=-0.8, tmax=0.8))
 
 # 18. Export
-exporter = EpochAnnotationExporter(config)
+# exporter = EpochAnnotationExporter(config)
 writer = Writer(config)
 
 if mode == "tep":
     writer.save_epochs(epochs_eeg_filtered, "processed_tep")
+    writer.save_emg_epochs(epochs_emg_filtered,'emg_processed')
 
 elif mode == "context_tree":
     writer.save_epochs(epochs_eeg_filtered, "processed_context_tree")
 
-    _, eeg_annotations_prepost = exporter.extract_annotations(
-        epochs_eeg_filtered
-    )
-
-    symbols_prepost = exporter.map_annotations_to_symbols(
-        eeg_annotations_prepost
-    )
-
-    exporter.export_to_mat(
-        writer,
-        epochs_eeg_filtered,
-        symbols_prepost,
-        subfolder="tree_retrieving",
-    )
-
-# EMG ---------------------------------------------------------------------
-writer.save_emg_epochs(
-    epochs_emg_filtered,
-    'emg_processed'
-)

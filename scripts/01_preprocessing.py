@@ -1,3 +1,5 @@
+"""Main script for TMS-EEG subject level preprocessing."""
+
 from pytep import apply_sound, apply_sspsir
 
 from tms_eeg.config.environment import setup_plotting_backend

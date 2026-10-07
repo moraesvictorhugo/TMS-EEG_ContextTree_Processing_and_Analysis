@@ -1,3 +1,5 @@
+"""Main script for convert epochs in mat files with different time windows"""
+
 ### Adapt code below to export epochs to Mat in different windows using 
 # context_tree_epochs
 

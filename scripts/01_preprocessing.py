@@ -1,4 +1,4 @@
-"""Main script for TMS-EEG subject level preprocessing."""
+"""Main script for TMS-EEG subject-level preprocessing."""
 
 from pytep import apply_sound, apply_sspsir
 

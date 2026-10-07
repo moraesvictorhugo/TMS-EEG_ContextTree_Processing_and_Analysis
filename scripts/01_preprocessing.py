@@ -144,8 +144,9 @@ epochs_emg_filtered = notch_filter(
     harmonics=1,
 )
 
-# 16. Baseline correction ????
+# 16. Baseline correction ou nova interpolação????
 # epochs_eeg_filtered.apply_baseline(config.epoch_eeg_baseline)
+# epochs_eeg_filtered_test = ArtifactRemover(config).remove_tms_artifact(epochs_eeg_filtered.copy(), mode="tesa")
 
 # Check TEP quality
 tep_plotter = TEPPlotter(config)

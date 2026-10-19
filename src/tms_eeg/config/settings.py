@@ -52,6 +52,10 @@ class ProjectConfig:
     epoch_eeg_detrend: int | None = 1
     epoch_emg_detrend: int | None = None
 
+    # Export .mat time windows (seconds)
+    export_pre_and_post_window: tuple = (-0.8, 0.8)
+    export_only_post_window: tuple = (0.0, 0.8)
+
     # ICA
     ica_run: bool = True
     ica_plot_components: bool = True

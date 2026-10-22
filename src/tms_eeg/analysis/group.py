@@ -17,6 +17,7 @@ class MetricsCollector:
         "channel",
         "component",
         "metric",
+        "unit",
         "value",
     )
     ANALYSIS_LEVELS = {"channel", "roi"}
@@ -34,6 +35,7 @@ class MetricsCollector:
         component: str | None,
         metric: str,
         value: float,
+        unit: str | None = None,
     ) -> None:
         """Add one long-format metric observation.
 
@@ -55,6 +57,7 @@ class MetricsCollector:
             "channel": channel,
             "component": component,
             "metric": metric,
+            "unit": unit,
             "value": value,
         })
 

@@ -90,6 +90,11 @@ class ProjectConfig:
         "N100": (0.070, 0.150),
         "P180": (0.150, 0.200),
     })
+    analysis_peak_selection: str = "absolute"
+    analysis_auc_absolute: bool = False
+    analysis_p30_component: str = "P30"
+    analysis_n15_component: str = "N15"
+    analysis_csv_path: str = "data/group/database.csv"
     analysis_context_definitions: dict = field(default_factory=lambda: {
         "ctx_0":  [0],
         "ctx_2":  [2],

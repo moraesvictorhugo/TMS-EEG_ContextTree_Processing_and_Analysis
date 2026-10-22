@@ -25,12 +25,12 @@ setup_plotting_backend()
     - Was the EEG muscle artifact successfully removed?
     
 2 - Features
-    - Mean amplitude in P30 (use the window in config)
-    - Peak amplitude in P30 (use the window in config)
-    - AUC in P30 (use the window in config)
-    - N15-P30 peak-to-peak amplitude
+    - Mean amplitude in P30 (use the window in config) for both roi and channel level
+    - Peak amplitude in P30 (use the window in config) for both roi and channel level
+    - AUC in P30 (use the window in config) for both roi and channel level
+    - N15-P30 peak-to-peak amplitude for both roi and channel level
     - GMFP - Global measure of the response (only for channel level)
-    - LMFP - Local response (using rois)
+    - LMFP - Local response (using rois only)
 
 3 - Analisys level
     - Both roi and channel level
@@ -42,7 +42,7 @@ setup_plotting_backend()
     - Is there adaptation over time in context 21? Compare its first and last thirds.
     - Is there adaptation over time in context 11? Compare its first and last thirds.
 
-X - Export a long format table for statistics with columns as:
+5 - Export a long format table for statistics with columns as:
     - Participant ID
     - Block number
     - Trial number
@@ -59,8 +59,9 @@ X - Export a long format table for statistics with columns as:
 '''
 
 collector = MetricsCollector()
-subjects = ProjectConfig().analysis_subjects
-export_enabled = ProjectConfig().io_export_data
+project_config = ProjectConfig()
+subjects = project_config.analysis_subjects
+export_enabled = project_config.io_export_data
 
 for subject_id in subjects:
     config = ProjectConfig(subject_id=subject_id)
@@ -91,6 +92,8 @@ for subject_id in subjects:
         epochs,
         config.analysis_channels_of_interest,
         config.analysis_time_windows,
+        peak_selection=config.analysis_peak_selection,
+        auc_absolute=config.analysis_auc_absolute,
     )
 
     # ================================================================ #
@@ -100,12 +103,113 @@ for subject_id in subjects:
         roi_epochs,
         roi_epochs.ch_names,
         config.analysis_time_windows,
+        peak_selection=config.analysis_peak_selection,
+        auc_absolute=config.analysis_auc_absolute,
     )
 
-    # Add extracted feature rows to `collector` in both sections above.
-    # Use analysis_level="channel" for channel_extractor results and
-    # analysis_level="roi" for roi_extractor results. Each row should carry
-    # subject, analysis_type, condition, channel/ROI, component, metric, value.
+    # ── Channel-level condition features ──────────────────────────────
+    channel_features = channel_extractor.extract_condition_features(
+        component=config.analysis_p30_component,
+        component1=config.analysis_n15_component,
+        component2=config.analysis_p30_component,
+    )
+    for feature in channel_features.itertuples(index=False):
+        collector.add_row(
+            subject=subject_id,
+            analysis_level="channel",
+            analysis_type="condition",
+            condition=feature.condition,
+            channel=feature.channel,
+            component=feature.component,
+            metric=feature.metric,
+            value=feature.value,
+            unit=feature.unit,
+        )
+
+    # ── ROI-level condition features ──────────────────────────────────
+    roi_features = roi_extractor.extract_condition_features(
+        component=config.analysis_p30_component,
+        component1=config.analysis_n15_component,
+        component2=config.analysis_p30_component,
+    )
+    for feature in roi_features.itertuples(index=False):
+        collector.add_row(
+            subject=subject_id,
+            analysis_level="roi",
+            analysis_type="condition",
+            condition=feature.condition,
+            channel=feature.channel,
+            component=feature.component,
+            metric=feature.metric,
+            value=feature.value,
+            unit=feature.unit,
+        )
+
+    # GMFP is global across EEG channels, so it is recorded once per condition.
+    gmfp = channel_extractor.compute_gmfp()
+    gmfp_features = channel_extractor.extract_mfp_window_features(
+        gmfp, component=config.analysis_p30_component, label="GMFP"
+    )
+    gmfp_peaks = channel_extractor.extract_mfp_peaks(
+        gmfp, label="GMFP"
+    ).query("component == @config.analysis_p30_component")
+    for feature in gmfp_features.itertuples(index=False):
+        collector.add_row(
+            subject=subject_id,
+            analysis_level="channel",
+            analysis_type="condition",
+            condition=feature.condition,
+            channel=None,
+            component=feature.component,
+            metric=feature.metric,
+            value=feature.value,
+            unit=feature.unit,
+        )
+    for feature in gmfp_peaks.itertuples(index=False):
+        collector.add_row(
+            subject=subject_id,
+            analysis_level="channel",
+            analysis_type="condition",
+            condition=feature.condition,
+            channel=None,
+            component=feature.component,
+            metric="gmfp_peak_latency",
+            value=feature.peak_latency_ms,
+            unit="ms",
+        )
+
+    # LMFP is calculated over the saved ROI channels and recorded once per condition.
+    lmfp = roi_extractor.compute_lmfp()
+    lmfp_features = roi_extractor.extract_mfp_window_features(
+        lmfp, component=config.analysis_p30_component, label="LMFP"
+    )
+    lmfp_peaks = roi_extractor.extract_mfp_peaks(
+        lmfp, label="LMFP"
+    ).query("component == @config.analysis_p30_component")
+    for feature in lmfp_features.itertuples(index=False):
+        collector.add_row(
+            subject=subject_id,
+            analysis_level="roi",
+            analysis_type="condition",
+            condition=feature.condition,
+            channel=None,
+            component=feature.component,
+            metric=feature.metric,
+            value=feature.value,
+            unit=feature.unit,
+        )
+    for feature in lmfp_peaks.itertuples(index=False):
+        collector.add_row(
+            subject=subject_id,
+            analysis_level="roi",
+            analysis_type="condition",
+            condition=feature.condition,
+            channel=None,
+            component=feature.component,
+            metric="lmfp_peak_latency",
+            value=feature.peak_latency_ms,
+            unit="ms",
+        )
 
     # ================================================================ #
     #  PART 3 — CONTEXT-LEVEL ANALYSIS (original channel epochs)
@@ -132,8 +236,21 @@ for subject_id in subjects:
     # ── Contexts comparison ──────────────────────────────────────────
     tep_plotter.plot_context_comparison(context_epochs)
 
+    # ── Condition GMFP/LMFP plots ────────────────────────────────────
+    if set(gmfp) == set(lmfp):
+        mfp_plotter.plot_gmfp_lmfp(
+            gmfp,
+            lmfp,
+            time_windows=config.analysis_time_windows,
+        )
+    else:
+        print(
+            f"Skipping combined GMFP/LMFP plot for {subject_id}: "
+            "channel and ROI condition sets differ."
+        )
+
 # ── Export to CSV in long format if enabled ──
 database = collector.export_csv(
-    output_path="data/group/database.csv",
+    output_path=project_config.analysis_csv_path,
     export_enabled=export_enabled,
 )

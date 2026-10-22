@@ -82,5 +82,5 @@ data/
 *.mo
 *.po
 
-# SOUND-SSP project
-PyTEP-SOUND-SSP-SIR/
+# Image files
+*.jpeg

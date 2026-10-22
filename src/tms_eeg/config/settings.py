@@ -1,140 +1,137 @@
 from dataclasses import dataclass, field
-# field(default_factory=...) must be used for mutable types like lists
-# or dicts to avoid shared state across instances
+
 
 @dataclass
-class IOConfig:
-    export_data: bool = False
-    change_channel_types: bool = False
-    new_channel_names: dict = field(default_factory=dict)  # {"EEG 001": "Fp1"}
-    save_figs: bool = False
+class ProjectConfig:
+    """All project's configs.
+    """
 
-@dataclass
-class EventConfig:
-    event_ids: dict = field(default_factory=lambda: {
-        'stimulus_0': 0,
-        'stimulus_1': 1,
-        'stimulus_2': 2,
-    })
-    trigger_id: dict = field(default_factory=lambda: {'Stimulus A': 1})
-    trigger_8bits: tuple = (1, 2, 3)
-    stimulus_to_8bit_mapping: dict = field(default_factory=lambda: {
-        'Stimulus A': ['8bit 1', '8bit 2', '8bit 3'],
-    })
-    use_8bit_triggers: bool = False  # New field to control behavior
-    text_file_pattern: str = "*.txt"  # Pattern to find condition files
+    # identification
+    subject_id: str = ""
 
-@dataclass
-class ArtifactConfig:
-    window_removal_artifact: tuple = (-0.005, 0.012)
-    mode_removal_artifact: str = 'linear' # 'cubic'
+    # mode (context_tree: without trial exclusion, tep: apply trial exclusion)
+    mode: str = 'tep'     # context_tree  or tep
 
-@dataclass
-class FilterConfig:
-    eeg_bandpass: tuple = (1, 250)
-    emg_bandpass: tuple = (20, 500)
-    notch: tuple = (60, 120, 180, 240, 300)
-    eeg_filter_epoched_data: bool = True
-    eeg_bandpass_epochs: tuple = (None, 45)
+    # Input/Output
+    io_export_data: bool = True
+    io_save_figs: bool = False
 
-@dataclass
-class ChannelConfig:
-    eeg_reference: str = 'average'
-    remove_bad_channels: bool = True
-    bad_channels: tuple = ()
-    eog_label: str = 'EOG'
-    emg_label: str = 'EMG'
-    eeg_montage: str = 'standard_1020'
+    # Raw
+    raw_downsample_freq: float = 5000.0
 
-@dataclass
-class EpochConfig:
-    window: tuple = (-0.8, 0.8)
-    baseline: tuple = (-0.5, -0.01)  # ou None para desativar
-    downsample: bool = True
-    downsample_freq: float = 725.0
-    emg_downsample_freq: float = 3000.0
-    rejection_amplitude_threshold: dict = field(default_factory=lambda: {
-        'eeg': 1000e-6, 'eog': 5000e-6})               # 50 and 100 microvolts
-    rejection_flat_threshold: dict = field(
-        default_factory=lambda: {'eeg': 1e-6})      # 1 microvolts
+    # Events / triggers
+    event_trigger_id: dict = field(default_factory=lambda: {'Stimulus A': 1})
 
-@dataclass
-class ICAConfig:
-    run_ica: bool = True
-    plot_components: bool = True
-    use_ica_label: bool = False
+    # Artfact Removing
+    artifact_window: tuple = (-0.005, 0.012)
+    second_artifact_window: tuple = (-0.005, 0.012)
+    artifact_mode: str = 'cubic'
+    artifact_anchor_window_ms: float = 1.0
 
-@dataclass
-class AnalysisConfig:
-    subjects: list = field(default_factory=lambda: [
-        "V02", "V03", "V04", "V05", "V06", "V07"])
-    channels_of_interest: list = field(default_factory=lambda: [
+    # Filters
+    filter_eeg_highpass: tuple = (1, None)
+    filter_eeg_lowpass: tuple = (None, 80)
+    filter_emg_bandpass: tuple = (20, 500)
+    filter_notch: float = 60.0
+    filter_method: str = 'iir'          # 'fir' ou 'iir'
+    filter_iir_order: int = 4           # TESA: ordem 4 + filtfilt
+    filter_notch_width: float = 4.0     # Hz (58–62 para 60 Hz)
+
+    # Channels
+    ch_eeg_reference: str = 'average'
+    ch_eog_label: str = 'EOG'
+    ch_emg_label: str = 'EMG'
+    ch_eeg_montage: str = 'standard_1020'
+
+    # Epochs
+    epoch_window: tuple = (-0.8, 0.8)
+    epoch_eeg_baseline: tuple = (-0.3, -0.02)
+    epoch_emg_baseline: tuple | None = None
+    epoch_eeg_downsample_freq: float = 1000.0
+    epoch_emg_downsample_freq: float = 3000.0
+    epoch_eeg_detrend: int | None = 1
+    epoch_emg_detrend: int | None = None
+
+    # Export .mat time windows (seconds)
+    export_pre_and_post_window: tuple = (-0.8, 0.8)
+    export_only_post_window: tuple = (0.0, 0.8)
+
+    # ICA
+    ica_run: bool = True
+    ica_plot_components: bool = True
+
+    # Analysis
+    analysis_subjects: list = field(default_factory=lambda: [
+        "V04", "V05", "V07", "V08", "V09"])
+    analysis_channels_of_interest: list = field(default_factory=lambda: [
         "FC1", "FC5", "C3", "CP1", "CP5"])
-    time_windows: dict = field(default_factory=lambda: {
+    analysis_rois: dict = field(default_factory=lambda: {
+        "frontal_left": ["F3", "F7"],
+        "frontal_right": ["F4", "F8"],
+        "sensori_motora_left": ["FC1", "FC5", "C3", "CP1", "CP5"],
+        "sensori_motora_right": ["FC2", "FC6", "C4", "CP2", "CP6"],
+        "parietal_left": ["P3", "P7"],
+        "parietal_right": ["P4", "P8"],
+        "occipital_left": ["O1", "PO3"],
+        "occipital_right": ["O2", "PO4"],
+        "temporal_left": ["T7"],
+        "temporal_right": ["T8"],
+        "Fz": ["Fz"],
+        "Cz": ["Cz"],
+        "Pz": ["Pz"],
+        "frontopolar_left": ["Fp1", "AF3"],
+        "frontopolar_right": ["Fp2", "AF4"],
+    })
+    analysis_time_windows: dict = field(default_factory=lambda: {
         "N15":  (0.012, 0.020),
         "P30":  (0.020, 0.040),
         "N45":  (0.040, 0.055),
         "P60":  (0.050, 0.070),
         "N100": (0.070, 0.150),
-        "P180": (0.150, 0.200), # Defined following Beck et al (2024)
+        "P180": (0.150, 0.200),
     })
-    # GMFP / LMFP
-    compute_gmfp: bool = True
-    compute_lmfp: bool = True
-    # Features
-    calculate_p2p_amplitude: bool = True
-    # Context analysis
-    context_definitions: dict = field(default_factory=lambda: {
-        "ctx_0":  [0],        # atual=0, qualquer passado
-        "ctx_2":  [2],        # atual=2, qualquer passado
-        "ctx_01": [0, 1],     # anterior=0, atual=1
-        "ctx_11": [1, 1],     # anterior=1, atual=1
-        "ctx_21": [2, 1],     # anterior=2, atual=1
+    analysis_peak_selection: str = "absolute"
+    analysis_auc_absolute: bool = False
+    analysis_p30_component: str = "P30"
+    analysis_n15_component: str = "N15"
+    analysis_csv_path: str = "data/group/database.csv"
+    analysis_context_definitions: dict = field(default_factory=lambda: {
+        "ctx_0":  [0],
+        "ctx_2":  [2],
+        "ctx_01": [0, 1],
+        "ctx_11": [1, 1],
+        "ctx_21": [2, 1],
     })
-    # Mapping: event code (from find_events) → context symbol
-    event_to_symbol: dict = field(default_factory=lambda: {
-        1: 0,   # 8Bit 1 → símbolo 0 (80% rMT)
-        2: 1,   # 8Bit 2 → símbolo 1 (100% rMT)
-        3: 2,   # 8Bit 3 → símbolo 2 (120% rMT)
+    # Source of truth for 8-bit symbols and labels; the event mappings are
+    # derived in __post_init__.
+    analysis_name_to_symbol: dict = field(default_factory=lambda: {
+        "8bit 1": 0,
+        "8bit 2": 1,
+        "8bit 3": 2,
     })
 
-@dataclass
-class PlotConfig:
-    plot_raw: bool = True
-    plot_raw_psd: bool = True
-    plot_epochs: bool = True
-    plot_teps_by_stimulus: bool = True
-    plot_ica_components: bool = True
-    # Figure saving options
-    figure_format: str = "png"
-    figure_dpi: int = 600
-    figure_subfolder: str = "figures"
-    # TEP plotting options
-    tep_xlim: tuple = (-0.01, 0.2)
-    tep_topo_times: list = field(default_factory=lambda: [
-        0.005, 0.01, 0.02, 0.03, 0.04, 0.05,
-        0.06, 0.07, 0.08, 0.09, 0.1
-    ])
-    tep_joint_times: list = field(default_factory=lambda: [
+    # Figures
+    plot_format: str = "png"
+    plot_dpi: int = 600
+    plot_subfolder: str = "figures"
+    plot_tep_xlim: tuple = (-0.01, 0.2)
+    plot_tep_joint_times: list = field(default_factory=lambda: [
         0.015, 0.03, 0.045, 0.06, 0.1, 0.18
     ])
-    tep_roi_channels: list = field(default_factory=lambda: [
+    plot_tep_roi_channels: list = field(default_factory=lambda: [
         'C3', 'FC1', 'CP1', 'C4', 'FC5', 'CP5'
     ])
-    # EMG plotting options
-    emg_xlim: tuple = (-0.01, 0.08)
-    analysis_plots: bool = True
+    plot_analysis: bool = True
 
-@dataclass
-class ProjectConfig:
-    io: IOConfig = field(default_factory=IOConfig)
-    events: EventConfig = field(default_factory=EventConfig)
-    artifact: ArtifactConfig = field(default_factory=ArtifactConfig)
-    filters: FilterConfig = field(default_factory=FilterConfig)
-    channels: ChannelConfig = field(default_factory=ChannelConfig)
-    epochs: EpochConfig = field(default_factory=EpochConfig)
-    ica: ICAConfig = field(default_factory=ICAConfig)
-    analysis: AnalysisConfig = field(default_factory=AnalysisConfig)
-    plots: PlotConfig = field(default_factory=PlotConfig)
-    subject_id: str = ""
-    session: str = "_400pulses_TMS-EEG_ContextTree"
+    def __post_init__(self):
+        """Deriva os mapas restantes de ``analysis_name_to_symbol``."""
+        stimulus = next(iter(self.event_trigger_id))
+        labels = sorted(
+            self.analysis_name_to_symbol,
+            key=self.analysis_name_to_symbol.get,
+        )
+        self.event_stimulus_to_8bit_mapping = {stimulus: labels}
+        self.analysis_event_to_symbol = {
+            idx + 1: self.analysis_name_to_symbol[label]
+            for idx, label in enumerate(labels)
+        }

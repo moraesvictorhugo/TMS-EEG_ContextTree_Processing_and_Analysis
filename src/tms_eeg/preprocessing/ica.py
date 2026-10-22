@@ -1,53 +1,101 @@
-from src.tms_eeg.config.settings import ProjectConfig
-import mne
-import sklearn
 from pathlib import Path
 
+import mne
+
+from tms_eeg.config.settings import ProjectConfig
+
+
 class EEGICA:
-    def __init__(self, config: ProjectConfig):
+    def __init__(self, config: ProjectConfig, decisions: dict):
         self.config = config
-        self.ica = None
-        
-    def fit_ica(self, epochs: mne.Epochs) -> 'EEGICA':
-        """Fit ICA decomposition to epoched data."""
-        ica_cfg = self.config.ica
-        
-        if not ica_cfg.run_ica:
+        self.decisions = decisions
+        self.ica: mne.preprocessing.ICA | None = None
+
+    def calculate_rank(self, epochs: mne.Epochs) -> int:
+        """Calculate 32 minus bad EEG channels minus one for average reference."""
+        eeg_channels = {
+            name
+            for name, channel_type in zip(
+                epochs.ch_names, epochs.get_channel_types()
+            )
+            if channel_type == "eeg"
+        }
+
+        if len(eeg_channels) != 32:
+            raise ValueError(
+                f"Expected 32 EEG channels in epochs; found "
+                f"{len(eeg_channels)}."
+            )
+
+        bad_channels = set(self.decisions.get("bad_channels") or [])
+        unknown = bad_channels - eeg_channels
+        if unknown:
+            raise ValueError(
+                f"Channels listed in the YAML file are missing from the EEG "
+                f"channels: {sorted(unknown)}"
+            )
+
+        other_bad_eeg = (set(epochs.info["bads"]) & eeg_channels) - bad_channels
+        if other_bad_eeg:
+            raise ValueError(
+                f"EEG channels marked as bad but missing from the YAML file: "
+                f"{sorted(other_bad_eeg)}"
+            )
+
+        rank = 32 - len(bad_channels) - 1
+        if rank < 1:
+            raise ValueError(f"Invalid rank: {rank}")
+
+        return rank
+
+    def fit_ica(self, epochs: mne.Epochs) -> "EEGICA":
+        """Fit ICA to EEG channels, excluding bad channels listed in YAML."""
+        if not self.config.ica_run:
             return self
-            
-        # Fit ICA using FastICA
-        self.ica = mne.preprocessing.ICA(
-            n_components=20, 
-            random_state=97,
-            method='fastica'
+
+        rank = self.calculate_rank(epochs)
+        epochs_fit = epochs.copy()
+        epochs_fit.info["bads"] = sorted(
+            set(epochs_fit.info["bads"])
+            | set(self.decisions.get("bad_channels") or [])
         )
-        self.ica.fit(epochs)
-        
+
+        self.ica = mne.preprocessing.ICA(
+            n_components=rank,
+            random_state=97,
+            method="fastica",
+        )
+        self.ica.fit(epochs_fit, picks="eeg")
         return self
-        
-    def apply_ica(self, epochs: mne.Epochs, components_to_remove: list = None) -> mne.Epochs:
-        """Apply ICA to remove artifacts from epochs."""
+
+    def apply_ica(self, epochs: mne.Epochs) -> mne.Epochs:
+        """Apply ICA artifact rejection to a copy of the epochs.
+
+        Components to remove are set by ``apply_ica_exclude`` from the
+        ``ica_exclude`` field in the decisions YAML.
+        """
         if self.ica is None:
             return epochs
-            
-        # Apply ICA with configured components to remove
-        self.ica.exclude = components_to_remove 
-            
-        epochs_clean = self.ica.apply(epochs.copy())
-        return epochs_clean
-        
-    def plot_components(self, epochs: mne.Epochs, save_path: Path = None):
-        """Plot ICA components for manual inspection."""
-        if self.ica is None or not self.config.ica.plot_components:
+
+        return self.ica.apply(epochs.copy())
+
+    def plot_components(
+        self,
+        epochs: mne.Epochs,
+        save_path: Path | None = None,
+    ) -> None:
+        """Display ICA components and optionally save their topographies."""
+        if self.ica is None or not self.config.ica_plot_components:
             return
-            
-        # Plot component sources
+
         self.ica.plot_sources(epochs, show_scrollbars=False)
-        
-        # Plot component topographies
-        self.ica.plot_components(inst=epochs)
-        
-        # Save plots if path provided
-        if save_path:
+        figures = self.ica.plot_components(inst=epochs)
+
+        if save_path is not None:
             save_path.mkdir(parents=True, exist_ok=True)
-            self.ica.plot_components(inst=epochs, savefig=str(save_path / 'ica_components.png'))
+            if not isinstance(figures, list):
+                figures = [figures]
+
+            for index, figure in enumerate(figures, start=1):
+                suffix = "" if index == 1 else f"_{index}"
+                figure.savefig(save_path / f"ica_components{suffix}.png")

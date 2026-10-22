@@ -1,171 +1,75 @@
 """Group-level analysis utilities for collecting and aggregating metrics."""
 
+from __future__ import annotations
+
 import pandas as pd
 from pathlib import Path
-from typing import Dict, List, Optional
 
 
 class MetricsCollector:
     """Collects metrics in tidy (long) format for statistical analysis."""
 
+    COLUMNS = (
+        "subject",
+        "analysis_level",
+        "analysis_type",
+        "condition",
+        "channel",
+        "component",
+        "metric",
+        "unit",
+        "value",
+    )
+    ANALYSIS_LEVELS = {"channel", "roi"}
+
     def __init__(self):
-        self.rows: List[Dict] = []
+        self.rows: list[dict] = []
 
     def add_row(
         self,
         subject: str,
+        analysis_level: str,
         analysis_type: str,
         condition: str,
-        channel: str,
-        component: str,
+        channel: str | None,
+        component: str | None,
         metric: str,
         value: float,
+        unit: str | None = None,
     ) -> None:
-        """Add a single metric row."""
+        """Add one long-format metric observation.
+
+        ``channel`` contains an electrode name for channel-level analyses or
+        an ROI name for ROI-level analyses. It is ``None`` for metrics that
+        are not associated with an individual channel/ROI.
+        """
+        if analysis_level not in self.ANALYSIS_LEVELS:
+            raise ValueError(
+                f"Invalid analysis_level {analysis_level!r}; expected one of "
+                f"{sorted(self.ANALYSIS_LEVELS)}."
+            )
+
         self.rows.append({
             "subject": subject,
+            "analysis_level": analysis_level,
             "analysis_type": analysis_type,
             "condition": condition,
             "channel": channel,
             "component": component,
             "metric": metric,
+            "unit": unit,
             "value": value,
         })
 
-    def add_peak_to_peak(
-        self,
-        subject: str,
-        analysis_type: str,
-        condition: str,
-        channel: str,
-        component: str,
-        value: float,
-    ) -> None:
-        """Add a peak-to-peak amplitude row."""
-        self.add_row(
-            subject=subject,
-            analysis_type=analysis_type,
-            condition=condition,
-            channel=channel,
-            component=component,
-            metric="peak_to_peak_uV",
-            value=value,
-        )
-
-    def add_mfp_peaks(
-        self,
-        subject: str,
-        analysis_type: str,
-        condition: str,
-        channel: str,
-        component: str,
-        amplitude: float,
-        latency: float,
-    ) -> None:
-        """Add both amplitude and latency rows for an MFP peak."""
-        self.add_row(
-            subject=subject,
-            analysis_type=analysis_type,
-            condition=condition,
-            channel=channel,
-            component=component,
-            metric="peak_amplitude_uV",
-            value=amplitude,
-        )
-        self.add_row(
-            subject=subject,
-            analysis_type=analysis_type,
-            condition=condition,
-            channel=channel,
-            component=component,
-            metric="peak_latency_ms",
-            value=latency,
-        )
-
-    def collect_peak_to_peak_from_df(
-        self,
-        subject: str,
-        analysis_type: str,
-        df: pd.DataFrame,
-        component: str,
-    ) -> None:
-        """Collect peak-to-peak rows from a DataFrame.
-
-        Args:
-            subject: Subject ID.
-            analysis_type: "condition" or "context".
-            df: DataFrame with columns [condition, channel, component, peak_to_peak_uV].
-            component: Component label (e.g., "N15-P30").
-        """
-        for _, row in df.iterrows():
-            self.add_peak_to_peak(
-                subject=subject,
-                analysis_type=analysis_type,
-                condition=row["condition"],
-                channel=row["channel"],
-                component=component,
-                value=row["peak_to_peak_uV"],
-            )
-
-    def collect_mfp_peaks_from_df(
-        self,
-        subject: str,
-        analysis_type: str,
-        df: pd.DataFrame,
-        channel: str,
-    ) -> None:
-        """Collect MFP peak rows from a DataFrame.
-
-        Args:
-            subject: Subject ID.
-            analysis_type: "condition" or "context".
-            df: DataFrame with columns [condition, measure, component, peak_amplitude_uV, peak_latency_ms].
-            channel: Channel label ("GMFP" or "LMFP").
-        """
-        for _, row in df.iterrows():
-            self.add_mfp_peaks(
-                subject=subject,
-                analysis_type=analysis_type,
-                condition=row["condition"],
-                channel=channel,
-                component=row["component"],
-                amplitude=row["peak_amplitude_uV"],
-                latency=row["peak_latency_ms"],
-            )
-
-    def collect_context_dict(
-        self,
-        subject: str,
-        ctx_dict: Dict[str, pd.DataFrame],
-        collector_func,
-        **kwargs,
-    ) -> None:
-        """Collect rows from a context dictionary {ctx_name: DataFrame}.
-
-        Args:
-            subject: Subject ID.
-            ctx_dict: Dictionary mapping context names to DataFrames.
-            collector_func: Method to call for each DataFrame (collect_peak_to_peak_from_df or collect_mfp_peaks_from_df).
-            **kwargs: Additional arguments passed to collector_func.
-        """
-        for ctx_name, df in ctx_dict.items():
-            collector_func(
-                subject=subject,
-                analysis_type="context",
-                df=df,
-                condition=ctx_name,
-                **kwargs,
-            )
-
     def to_dataframe(self) -> pd.DataFrame:
         """Convert collected rows to a tidy DataFrame."""
-        return pd.DataFrame(self.rows)
+        return pd.DataFrame(self.rows, columns=self.COLUMNS)
 
     def export_csv(
         self,
         output_path: str = "data/group/all_subjects_metrics.csv",
         export_enabled: bool = True,
-    ) -> Optional[pd.DataFrame]:
+    ) -> pd.DataFrame | None:
         """Export collected rows to CSV if enabled.
 
         Args:
@@ -176,6 +80,12 @@ class MetricsCollector:
             The DataFrame if exported, None otherwise.
         """
         df = self.to_dataframe()
+
+        if df.empty:
+            raise ValueError(
+                "No metrics have been collected; refusing to export an empty "
+                "metrics CSV. Add feature results before calling export_csv()."
+            )
 
         if export_enabled:
             path = Path(output_path)

@@ -1,133 +1,96 @@
+import re
+
 import mne
 import numpy as np
-from src.tms_eeg.config.settings import ProjectConfig
+
+from tms_eeg.config.settings import ProjectConfig
 
 
-class EEGEpocher:
-    def __init__(self, config: ProjectConfig):
-        self.config = config
+def find_events(raw: mne.io.BaseRaw, config: ProjectConfig) -> tuple[np.ndarray, dict]:
+    """Find events using configured trigger_id or 8bit labels as fallback."""
+    trigger_id = config.event_trigger_id
+    raw_descriptions = {str(d) for d in raw.annotations.description}
 
-    def find_events(self, raw: mne.io.BaseRaw) -> tuple[np.ndarray, dict]:
-        """Find events using configured trigger_id or 8bit labels as fallback."""
-        trigger_id = self.config.events.trigger_id
-        raw_descriptions = {str(d) for d in raw.annotations.description}
+    # Try configured trigger_id (e.g. 'Stimulus A')
+    try:
+        events, event_id = mne.events_from_annotations(
+            raw, event_id=trigger_id,
+        )
+        return events, event_id
+    except ValueError:
+        pass
 
-        # Try configured trigger_id (e.g. 'Stimulus A')
+    # Fallback: try 8bit labels from stimulus mapping
+    eight_bit_id = {
+        label: idx + 1
+        for labels in config.event_stimulus_to_8bit_mapping.values()
+        for idx, label in enumerate(labels)
+    }
+
+    # Case-insensitive matching: remap config labels to actual raw labels
+    raw_desc_lower = {d.lower(): d for d in raw_descriptions}
+    resolved_id = {}
+    for label, idx in eight_bit_id.items():
+        if label in raw_descriptions:
+            resolved_id[label] = idx
+        elif label.lower() in raw_desc_lower:
+            resolved_id[raw_desc_lower[label.lower()]] = idx
+
+    if resolved_id:
+        # Build regexp to match only the resolved labels
+        pattern = "|".join(re.escape(k) for k in resolved_id)
         try:
             events, event_id = mne.events_from_annotations(
-                raw, event_id=trigger_id,
+                raw, regexp=pattern,
             )
-            return events, event_id
+            # Remap event_id values to our resolved indices
+            final_event_id = {}
+            for ann_label, mne_idx in event_id.items():
+                matched = str(ann_label).lower()
+                for res_label, res_idx in resolved_id.items():
+                    if res_label.lower() == matched:
+                        final_event_id[ann_label] = res_idx
+                        break
+
+            # Remap event codes in the events array
+            for ann_label, mne_idx in event_id.items():
+                if ann_label in final_event_id:
+                    events[events[:, 2] == mne_idx, 2] = final_event_id[ann_label]
+
+            print(f"[find_events] Using 8bit event_id: {final_event_id}")
+            return events, final_event_id
         except ValueError:
             pass
 
-        # Fallback: try 8bit labels from stimulus mapping
-        eight_bit_id = {
-            label: idx + 1
-            for labels in self.config.events.stimulus_to_8bit_mapping.values()
-            for idx, label in enumerate(labels)
-        }
+    # No valid annotations found
+    raise ValueError(
+        f"[find_events] No events found with trigger_id={trigger_id} "
+        f"or 8bit_id={eight_bit_id}. "
+        f"Raw annotations found: {raw_descriptions}"
+    )
 
-        # Case-insensitive matching: remap config labels to actual raw labels
-        raw_desc_lower = {d.lower(): d for d in raw_descriptions}
-        resolved_id = {}
-        for label, idx in eight_bit_id.items():
-            if label in raw_descriptions:
-                resolved_id[label] = idx
-            elif label.lower() in raw_desc_lower:
-                resolved_id[raw_desc_lower[label.lower()]] = idx
+def create_epochs(
+    raw: mne.io.BaseRaw,
+    config: ProjectConfig,
+    modality: str = "eeg",
+) -> mne.Epochs:
+    """Create epochs from raw data using the configured window/baseline."""
+    events, event_id = find_events(raw, config)
 
-        if resolved_id:
-            # Build regexp to match only the resolved labels
-            import re
-            pattern = "|".join(re.escape(k) for k in resolved_id)
-            try:
-                events, event_id = mne.events_from_annotations(
-                    raw, regexp=pattern,
-                )
-                # Remap event_id values to our resolved indices
-                final_event_id = {}
-                for ann_label, mne_idx in event_id.items():
-                    matched = str(ann_label).lower()
-                    for res_label, res_idx in resolved_id.items():
-                        if res_label.lower() == matched:
-                            final_event_id[ann_label] = res_idx
-                            break
+    if modality == "emg":
+        baseline, detrend = config.epoch_emg_baseline, config.epoch_emg_detrend
+    else:
+        baseline, detrend = config.epoch_eeg_baseline, config.epoch_eeg_detrend
 
-                # Remap event codes in the events array
-                for ann_label, mne_idx in event_id.items():
-                    if ann_label in final_event_id:
-                        events[events[:, 2] == mne_idx, 2] = final_event_id[ann_label]
-
-                print(f"[EEGEpocher] Using 8bit event_id: {final_event_id}")
-                return events, final_event_id
-            except ValueError:
-                pass
-
-        # No valid annotations found
-        raise ValueError(
-            f"[EEGEpocher] No events found with trigger_id={trigger_id} "
-            f"or 8bit_id={eight_bit_id}. "
-            f"Raw annotations found: {raw_descriptions}"
-        )
-
-
-    def create_epochs(self, raw: mne.io.BaseRaw) -> mne.Epochs:
-        """Create epochs from raw data.
-
-        Args:
-            raw (mne.io.BaseRaw): Preprocessed raw EEG data.
-
-        Returns:
-            mne.Epochs: Epoched EEG data.
-        """
-        epoch_cfg = self.config.epochs
-
-        events, event_id = self.find_events(raw)
-
-        epochs = mne.Epochs(
-            raw,
-            events=events,
-            event_id=event_id,
-            tmin=epoch_cfg.window[0],
-            tmax=epoch_cfg.window[1],
-            baseline=epoch_cfg.baseline,
-            preload=True,
-            reject=None,
-            flat=None
-        )
-
-        return epochs
-
-    @staticmethod
-    def reject_bad(epochs: mne.Epochs, thresholds: dict,
-                   flat_thresholds: dict = None) -> mne.Epochs:
-        """Reject bad epochs based on amplitude thresholds.
-
-        Args:
-            epochs (mne.Epochs): Epochs to process.
-            thresholds (dict): Max amplitude thresholds per channel type
-                (e.g. {"eeg": 150e-6}).
-            flat_thresholds (dict, optional): Min amplitude thresholds per
-                channel type. Defaults to None.
-
-        Returns:
-            mne.Epochs: Cleaned epochs (copy).
-        """
-        epochs = epochs.copy()
-
-        available = set(
-            mne.channel_type(epochs.info, i)
-            for i in range(len(epochs.ch_names))
-        )
-
-        reject = {k: v for k, v in thresholds.items() if k in available}
-        flat = (
-            {k: v for k, v in flat_thresholds.items() if k in available}
-            if flat_thresholds else None
-        )
-
-        epochs.drop_bad(reject=reject, flat=flat)
-        print(f"[EEGEpocher] Remaining epochs: {len(epochs)}/{len(epochs.drop_log)}")
-        return epochs
- 
+    return mne.Epochs(
+        raw,
+        events=events,
+        event_id=event_id,
+        tmin=config.epoch_window[0],
+        tmax=config.epoch_window[1],
+        baseline=baseline,
+        preload=True,
+        reject=None,
+        flat=None,
+        detrend=detrend,
+    )

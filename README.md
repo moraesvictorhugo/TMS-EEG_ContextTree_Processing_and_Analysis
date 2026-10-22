@@ -50,6 +50,10 @@ cd TMS-EEG_ContextTree_Processing_and_Analysis
 uv sync
 ```
 
+### VS Code
+
+Select the project interpreter once per machine: run **Python: Select Interpreter** and choose the `.venv` folder in the workspace. The `.venv` environment is auto-detected on both Linux and Windows.
+
 ### Using pip
 
 ```bash
@@ -184,24 +188,24 @@ The project uses a flexible configuration system based on Python dataclasses. Co
 ### Basic Configuration
 
 ```python
-from src.tms_eeg.config.settings import ProjectConfig
+from tms_eeg.config.settings import ProjectConfig
 
 # Create configuration for a specific subject
 config = ProjectConfig(subject_id="V07")
 
 # Access configuration sections
-print(config.analysis.subjects)  # List of subjects
-print(config.analysis.channels_of_interest)  # EEG channels to analyze
-print(config.analysis.time_windows)  # Time windows for analysis
+print(config.analysis_subjects)  # List of subjects
+print(config.analysis_channels_of_interest)  # EEG channels to analyze
+print(config.analysis_time_windows)  # Time windows for analysis
 ```
 
 ### Customizing Analysis Parameters
 
 ```python
 # Modify configuration
-config.analysis.subjects = ["V01", "V02", "V03"]  # Change subject list
-config.analysis.channels_of_interest = ["C3", "Cz", "C4"]  # Change channels
-config.analysis.time_windows = {
+config.analysis_subjects = ["V01", "V02", "V03"]  # Change subject list
+config.analysis_channels_of_interest = ["C3", "Cz", "C4"]  # Change channels
+config.analysis_time_windows = {
     "N15": (0.012, 0.020),
     "P30": (0.020, 0.040),
     # Add custom time windows
@@ -213,7 +217,7 @@ config.analysis.time_windows = {
 The context tree analysis can be customized by modifying the context definitions:
 
 ```python
-config.analysis.context_definitions = {
+config.analysis_context_definitions = {
     "ctx_0": [0],           # Current stimulus = 0, any past
     "ctx_2": [2],           # Current stimulus = 2, any past  
     "ctx_01": [0, 1],       # Previous = 0, current = 1
@@ -238,9 +242,9 @@ The preprocessing pipeline (`main_preprocessing.py`) handles:
 
 ```python
 # Example: Custom preprocessing
-from src.tms_eeg.config.settings import ProjectConfig
-from src.tms_eeg.preprocessing.epoching import EEGEpocher
-from src.tms_eeg.preprocessing.artifacts import ArtifactRemover
+from tms_eeg.config.settings import ProjectConfig
+from tms_eeg.preprocessing.epoching import EEGEpocher
+from tms_eeg.preprocessing.artifacts import ArtifactRemover
 
 config = ProjectConfig(subject_id="V07")
 # ... preprocessing steps as defined in main_preprocessing.py
@@ -257,9 +261,9 @@ The analysis pipeline (`main_analysis.py`) performs:
 
 ```python
 # Example: Custom analysis
-from src.tms_eeg.config.settings import ProjectConfig
-from src.tms_eeg.analysis.features import FeatureExtractor
-from src.tms_eeg.analysis.context import ContextMapper
+from tms_eeg.config.settings import ProjectConfig
+from tms_eeg.analysis.features import FeatureExtractor
+from tms_eeg.analysis.context import ContextMapper
 
 config = ProjectConfig(subject_id="V07")
 # ... analysis steps as defined in main_analysis.py

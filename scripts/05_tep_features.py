@@ -13,6 +13,54 @@ from tms_eeg.visualization.tep_plots import TEPPlotter
 
 setup_plotting_backend()
 
+'''
+# To-do:
+
+1 - Define first subject's validation based on criterias as:
+    - Are MEPs different between 0, 1 and 2?
+    - Are MEPs > 50 uV in 1?
+    - EEG muscle artifact was succesfully removed?
+    
+2 - Features
+    - Mean amplitude in P30
+    - Peak amplitude in P30
+    - AUC in P30
+    - N15-P30 peak-to-peak amplitude
+    - GMFP - Global measure of the response
+    - LMFP - Local response
+    - 
+
+3 - Electrodes
+    - All of them? or clustered?
+
+4 - Define TEP comparisions for time, frequency and time-frequency domains:
+    - Is the TEP response the same in 1 expected (context 21) and 1 unexpected (ctx 01)?
+    - Is the TEP response the same in 1 after a predictable 2 (context 21) and 1 after unpredictable (ctx 11)?
+    - Are the TEP response in contexts 01, 11 and 21 different? The question here is focused in what was the previous pulse
+    - Are there any adaptation in 21 context over time? Compare the first 1/3 od 21 with the last 1/3 21 context
+    - Are there any adaptation in 11 context over time? Compare the first 1/3 od 11 with the last 1/3 11 context
+
+
+X - Export a long format table for statistics with columns as:
+    - Participant ID
+    - Block number
+    - Trial number
+    - TMS pulse intensity (0, 1 or 2)
+    - Context (Following Hernández, an example of context in my case is: present pulse + past pulse = 11)
+    - Number of times this context appeared
+    - Predictability of this context
+    - Interval to previous pulse
+    - Interval to previous same intensity pulse (usefull???)
+    - pre-pulse cortical state (how???)
+    - features selected post pulse (what???)
+    - Volunteer classified as invalid must be included in analisys and export but with a identifier column
+    - add a column for included/excluded volunteer and another for reason
+    - 
+
+
+
+'''
+
 collector = MetricsCollector()
 subjects = ProjectConfig().analysis_subjects
 export_enabled = ProjectConfig().io_export_data

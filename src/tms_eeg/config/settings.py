@@ -44,7 +44,7 @@ class ProjectConfig:
     ch_eeg_montage: str = 'standard_1020'
 
     # Epochs
-    epoch_window: tuple = (-1.0, 1.0)
+    epoch_window: tuple = (-0.8, 0.8)
     epoch_eeg_baseline: tuple = (-0.3, -0.02)
     epoch_emg_baseline: tuple | None = None
     epoch_eeg_downsample_freq: float = 1000.0

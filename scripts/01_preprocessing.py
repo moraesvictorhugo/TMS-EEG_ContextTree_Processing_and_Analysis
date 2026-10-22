@@ -50,7 +50,7 @@ data_filtered = bandpass(
     iir_order=config.filter_iir_order,
 )
 
-# 3. Process annotations and create Epochs from −1000 to +1000 ms
+# 3. Process annotations and create Epochs from −800 to +800 ms
 annotation_processor = AnnotationProcessor(config)
 data_filtered = annotation_processor.process_annotations(data_filtered)
 
@@ -58,6 +58,10 @@ epochs_eeg = create_epochs(data_filtered, config)
 
 epochs_emg = create_epochs(data_filtered, config, modality="emg")
 epochs_emg.pick([config.ch_emg_label])
+
+# Detrend customizado (não usar o detrend do mne -> não usar da época, apenas período pré com função customizada e aplica aqui)
+
+# Correção baseline 
 
 # 4. Save epoch index and annotation sequence to YAML
 export_epochs_to_decisions(config, epochs_eeg)
@@ -83,6 +87,10 @@ epochs_eeg = apply_bad_epochs(epochs_eeg, decisions, config)
 epochs_eeg.set_eeg_reference(config.ch_eeg_reference)
 
 # 8. Fit ICA and mark component to remove in decisions file
+
+# ICA .95 das componentes que explicam o sinal apenas com o sinal pré estímulo.
+# Apenas para tirar piscada (todas com resquício de piscada)
+
 ica_processor = EEGICA(config, decisions)
 ica_processor.fit_ica(epochs_eeg)
 ica_processor.plot_components(epochs_eeg)

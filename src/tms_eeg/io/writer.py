@@ -13,12 +13,12 @@ class Writer:
     
     def __init__(self, config):
         """
-        Initialize Writer with project configuration.
+        Initialize the writer with project configuration.
         
         Parameters
         ----------
         config : ProjectConfig
-            Configuration object containing subject_id and other settings
+            Configuration containing the subject ID and export settings.
         """
         self.config = config
         self.subject_id = config.subject_id
@@ -63,7 +63,7 @@ class Writer:
         base_name: str = "epochs",
     ) -> None:
         """
-        Save processed epochs to the processed directory.
+            Processed epochs to the subject's processed directory.
         
         Parameters
         ----------
@@ -166,8 +166,7 @@ class Writer:
 
 
 def save_figure(fig: Figure, name: str, config) -> None:
-    """Save ``fig`` se ``config.io_save_figs`` estiver habilitado —
-    único caminho de salvamento de figuras do projeto."""
+    """Save ``fig`` when ``config.io_save_figs`` is enabled."""
     if config is None or not config.io_save_figs or fig is None:
         return
 

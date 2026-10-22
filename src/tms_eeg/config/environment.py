@@ -2,7 +2,7 @@ import os
 
 
 def setup_plotting_backend():
-    """Configura backend de plotagem baseado no ambiente de execução."""
+    """Select a plotting backend based on the execution environment."""
     import matplotlib
     import mne
 

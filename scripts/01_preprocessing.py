@@ -41,7 +41,7 @@ raw_data.set_montage(config.ch_eeg_montage)
 # 1. Cubic interpolation of the TMS artifact
 raw_data = ArtifactRemover(config).remove_tms_artifact(raw_data, mode="tesa")
 
-# 2. High-Pass filltering for ICA stability
+# 2. High-pass filtering for ICA stability
 data_filtered = bandpass(
     raw_data,
     band=config.filter_eeg_highpass,
@@ -59,14 +59,14 @@ epochs_eeg = create_epochs(data_filtered, config)
 epochs_emg = create_epochs(data_filtered, config, modality="emg")
 epochs_emg.pick([config.ch_emg_label])
 
-# Detrend customizado (não usar o detrend do mne -> não usar da época, apenas período pré com função customizada e aplica aqui)
+# Apply custom detrending to the prestimulus interval only; do not use MNE's epoch-wide detrending.
 
-# Correção baseline 
+# Baseline correction
 
 # 4. Save epoch index and annotation sequence to YAML
 export_epochs_to_decisions(config, epochs_eeg)
 
-# Check
+# Inspect the initial TEPs.
 tep_plotter = TEPPlotter(config)
 tep_plotter.plot_evoked_by_symbol(
     epochs_eeg,
@@ -86,10 +86,8 @@ epochs_eeg = apply_bad_epochs(epochs_eeg, decisions, config)
 # 7. Average reference (ignoring channels marked as bad)
 epochs_eeg.set_eeg_reference(config.ch_eeg_reference)
 
-# 8. Fit ICA and mark component to remove in decisions file
-
-# ICA .95 das componentes que explicam o sinal apenas com o sinal pré estímulo.
-# Apenas para tirar piscada (todas com resquício de piscada)
+# 8. Fit ICA and select components for removal in the decisions file.
+# Use 95% explained variance, fitting on the prestimulus interval to remove residual blink artifacts.
 
 ica_processor = EEGICA(config, decisions)
 ica_processor.fit_ica(epochs_eeg)
@@ -152,7 +150,7 @@ epochs_emg_filtered = notch_filter(
     harmonics=1,
 )
 
-# 16. Baseline correction ou nova interpolação????
+# 16. Baseline correction or another interpolation pass?
 # epochs_eeg_filtered.apply_baseline(config.epoch_eeg_baseline)
 # epochs_eeg_filtered_test = ArtifactRemover(config).remove_tms_artifact(epochs_eeg_filtered.copy(), mode="tesa")
 

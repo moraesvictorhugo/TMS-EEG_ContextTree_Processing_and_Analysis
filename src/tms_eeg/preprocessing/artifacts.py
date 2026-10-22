@@ -21,7 +21,7 @@ class ArtifactRemover:
     # Picks
     # ------------------------------------------------------------------ #
     def _resolve_picks(self, info: mne.Info, picks: Picks = None) -> np.ndarray:
-        """None -> todos os canais exceto stim; senão, usa o pick especificado."""
+        """Resolve channels from explicit picks, config, or all non-stim channels."""
         if picks is None:
             picks = getattr(self.config, "artifact_picks", None)
 
@@ -163,7 +163,7 @@ class ArtifactRemover:
 
     def interp_tms_tesa_like(self, raw: mne.io.BaseRaw,
                              picks_idx: np.ndarray | None = None) -> mne.io.BaseRaw:
-        """Interpolação polinomial ao estilo TESA, ajustada só nas âncoras."""
+        """Interpolate the artifact with a TESA-style polynomial fit to anchor samples."""
         tmin, tmax = self.config.artifact_window
         anchor_ms = self._get_tesa_anchor_ms()
         order = getattr(self.config, "artifact_poly_order", 3)
@@ -188,7 +188,7 @@ class ArtifactRemover:
 
         for ev in tms_events[:, 0]:
             c = ev - raw_out.first_samp
-            a, b = c + s_start, c + s_end            # região interpolada: [a, b)
+            a, b = c + s_start, c + s_end            # Interpolated interval: [a, b).
             pre = np.arange(a - n_pre, a)
             post = np.arange(b, b + n_post)
             if pre[0] < 0 or post[-1] >= n_times:
@@ -200,7 +200,7 @@ class ArtifactRemover:
             t_anc = (anc - c) * 1e3 / sfreq
             t_tgt = (tgt - c) * 1e3 / sfreq
 
-            y = data[np.ix_(picks_idx, anc)].T       # (n_anc, n_ch)
+            y = data[np.ix_(picks_idx, anc)].T       # Shape: (n_anchors, n_channels).
             p = np.polyfit(t_anc, y, order)
             data[np.ix_(picks_idx, tgt)] = (np.vander(t_tgt, order + 1) @ p).T
 

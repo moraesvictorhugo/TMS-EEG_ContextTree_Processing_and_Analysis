@@ -13,7 +13,7 @@ class ProjectConfig:
     mode: str = 'tep'     # context_tree  or tep
 
     # Input/Output
-    io_export_data: bool = False
+    io_export_data: bool = True
     io_save_figs: bool = False
 
     # Raw
@@ -62,7 +62,7 @@ class ProjectConfig:
 
     # Analysis
     analysis_subjects: list = field(default_factory=lambda: [
-        "V04", "V05", "V04", "V07", "V08", "V09"])
+        "V04", "V05", "V07", "V08", "V09"])
     analysis_channels_of_interest: list = field(default_factory=lambda: [
         "FC1", "FC5", "C3", "CP1", "CP5"])
     analysis_rois: dict = field(default_factory=lambda: {
@@ -97,8 +97,8 @@ class ProjectConfig:
         "ctx_11": [1, 1],
         "ctx_21": [2, 1],
     })
-    # Única fonte dos símbolos/labels 8-bit — event_stimulus_to_8bit_mapping
-    # e analysis_event_to_symbol são derivados em __post_init__.
+    # Source of truth for 8-bit symbols and labels; the event mappings are
+    # derived in __post_init__.
     analysis_name_to_symbol: dict = field(default_factory=lambda: {
         "8bit 1": 0,
         "8bit 2": 1,

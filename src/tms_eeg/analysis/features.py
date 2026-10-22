@@ -5,16 +5,15 @@ from typing import Dict, List, Tuple, Optional
 
 
 def mean_field_power(evoked: mne.Evoked) -> np.ndarray:
-    """Mean field power: desvio-padrão dos canais em cada ponto do tempo.
+    """Return the standard deviation across channels at each time point.
 
-    Único local de cálculo de GMFP/LMFP (std across channels) — usado por
-    :class:`FeatureExtractor` e pelos plotters de TEP.
+    Shared GMFP/LMFP calculation used by :class:`FeatureExtractor` and TEP plotters.
     """
     return evoked.data.std(axis=0)
 
 
 class FeatureExtractor:
-    """Extrai features de amplitude de epochs EEG."""
+    """Extract amplitude features from EEG epochs."""
 
     def __init__(
         self,
@@ -36,14 +35,14 @@ class FeatureExtractor:
         picks: Optional[List[str]] = None,
     ) -> Dict[str, mne.Evoked]:
         """
-        Retorna o Evoked (TEP médio) por condição.
+        Return the average TEP for each condition.
 
         Parameters
         ----------
         conditions : list of str, optional
-            Condições a extrair. Se None, usa todas do epochs.event_id.
+            Conditions to extract. If None, use all keys in ``epochs.event_id``.
         picks : list of str, optional
-            Canais a selecionar. Se None, usa self.channels (ROI).
+            Channels to select. If None, use ``self.channels`` (ROI).
         """
         if conditions is None:
             conditions = list(self.epochs.event_id.keys())
@@ -66,11 +65,11 @@ class FeatureExtractor:
         evokeds: Optional[Dict[str, mne.Evoked]] = None,
     ) -> pd.DataFrame:
         """
-        Amplitude pico-a-pico entre dois componentes, calculada sobre
-        o Evoked de cada condição/canal.
+        Compute peak-to-peak amplitude between two components for each
+        condition and channel.
 
-        Identifica o pico real (maior deflexão em módulo) em cada janela,
-        independente da polaridade.
+        Select the largest absolute deflection in each window, regardless
+        of polarity.
         """
         if evokeds is None:
             evokeds = self.get_evokeds()
@@ -110,7 +109,7 @@ class FeatureExtractor:
         conditions: Optional[List[str]] = None,
     ) -> Dict[str, np.ndarray]:
         """
-        Global Mean Field Power: std across ALL EEG channels per time point.
+        Compute global mean field power across all EEG channels per time point.
 
         Returns dict {condition: 1-D array of shape (n_times,)}.
         """
@@ -129,7 +128,7 @@ class FeatureExtractor:
         conditions: Optional[List[str]] = None,
     ) -> Dict[str, np.ndarray]:
         """
-        Local Mean Field Power: std across ROI channels per time point.
+        Compute local mean field power across ROI channels per time point.
 
         Returns dict {condition: 1-D array of shape (n_times,)}.
         """
@@ -149,20 +148,19 @@ class FeatureExtractor:
         label: str = "GMFP",
     ) -> pd.DataFrame:
         """
-        Extrai amplitude de pico e latência de cada time_window
-        a partir de uma curva MFP (GMFP ou LMFP).
+        Extract peak amplitude and latency from GMFP or LMFP curves.
 
         Parameters
         ----------
         mfp_data : dict
-            {condition: 1-D array} retornado por compute_gmfp ou compute_lmfp.
+            Mapping of conditions to 1-D arrays from ``compute_gmfp`` or ``compute_lmfp``.
         label : str
-            "GMFP" ou "LMFP" — usado na coluna 'measure'.
+            "GMFP" or "LMFP", used in the ``measure`` column.
 
         Returns
         -------
         pd.DataFrame
-            Colunas: condition, measure, component, peak_amplitude_uV, peak_latency_ms
+            Columns: condition, measure, component, peak_amplitude_uV, peak_latency_ms.
         """
         times = self.epochs.times
         rows = []
@@ -198,7 +196,7 @@ class FeatureExtractor:
         self,
         conditions: Optional[List[str]] = None,
     ) -> Dict[str, mne.Evoked]:
-        """Retorna evokeds com TODOS os canais EEG (para GMFP)."""
+        """Return evokeds containing all EEG channels for GMFP."""
         if conditions is None:
             conditions = list(self.epochs.event_id.keys())
 

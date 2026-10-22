@@ -1,32 +1,32 @@
 ## Pipeline TESA (Rogasch et al., 2017)
 
-Esta é a sequência recomendada no manual e no artigo do TESA, com a ICA feita em duas rodadas:
+This is the sequence recommended in the TESA manual and paper, with ICA performed in two rounds:
 
-| # | Etapa | Função TESA |
+| # | Step | TESA function |
 |---|---|---|
-| 1 | Localizar os pulsos de TMS | `tesa_findpulse` |
-| 2 | Remover a janela do pulso (ex.: −2 a 10 ms) | `tesa_removedata` |
-| 3 | Interpolar a janela removida (cúbica), necessário antes de fazer downsample | `tesa_interpdata` |
-| 4 | Downsample (ex.: 5 kHz → 1 kHz) | `pop_resample` |
-| 5 | Epocar (−1 a 1 s) e corrigir a linha de base | `pop_epoch`, `pop_rmbase` |
-| 6 | Remover canais e trials ruins | manual ou `pop_rejkurt` |
-| 7 | **Zerar a janela interpolada** antes da ICA | `tesa_removedata` |
-| 8 | **ICA 1**: remover o artefato muscular grande evocado pela TMS | `tesa_fastica`, `tesa_compselect` |
-| 9 | Interpolar a janela removida de novo (cúbica) | `tesa_interpdata` |
-| 10 | **Filtrar**: passa-banda 1–100 Hz e rejeita-banda 48–52 Hz | `tesa_filtbutter` |
-| 11 | Zerar a janela interpolada de novo | `tesa_removedata` |
-| 12 | **ICA 2**: piscadas, movimentos oculares, músculo persistente, decaimento | `tesa_fastica`, `tesa_compselect` |
-| 13 | Interpolar a janela e os canais removidos | `tesa_interpdata`, `pop_interp` |
-| 14 | Rereferenciar para a média e corrigir a linha de base | `pop_reref` |
+| 1 | Find TMS pulses | `tesa_findpulse` |
+| 2 | Remove the pulse window (e.g., −2 to 10 ms) | `tesa_removedata` |
+| 3 | Interpolate the removed window (cubic), before downsampling | `tesa_interpdata` |
+| 4 | Downsample (e.g., 5 kHz → 1 kHz) | `pop_resample` |
+| 5 | Epoch (−1 to 1 s) and apply baseline correction | `pop_epoch`, `pop_rmbase` |
+| 6 | Remove bad channels and trials | Manual or `pop_rejkurt` |
+| 7 | **Zero the interpolated window** before ICA | `tesa_removedata` |
+| 8 | **ICA 1**: remove the large TMS-evoked muscle artifact | `tesa_fastica`, `tesa_compselect` |
+| 9 | Interpolate the removed window again (cubic) | `tesa_interpdata` |
+| 10 | **Filter**: 1–100 Hz bandpass and 48–52 Hz bandstop | `tesa_filtbutter` |
+| 11 | Zero the interpolated window again | `tesa_removedata` |
+| 12 | **ICA 2**: remove blinks, eye movements, residual muscle, and decay | `tesa_fastica`, `tesa_compselect` |
+| 13 | Interpolate the window and removed channels | `tesa_interpdata`, `pop_interp` |
+| 14 | Re-reference to the average and apply baseline correction | `pop_reref` |
 
-## Pontos relevantes para a sua refatoração
+## Notes for the refactor
 
-1. **O filtro do TESA não é FIR.** O `tesa_filtbutter` usa um **Butterworth IIR de ordem 4, de fase zero** (`filtfilt`) e aplica um rejeita-banda de 4 Hz. Por isso a largura de 4 Hz do seu `band=(58, 62)` bate com o TESA adaptado para a rede de 60 Hz.
-2. **A filtragem só acontece depois da ICA 1.** O artefato muscular grande sai antes de filtrar, e é isso que reduz o ringing. A interpolação cúbica sozinha não é suficiente, e o TESA também parte desse princípio.
-3. **Os harmônicos não são filtrados.** O passa-baixa de 100 Hz já remove 120 Hz em diante, e a rede fica coberta apenas pelo notch de 60 Hz.
-4. **Existem alternativas no lugar da ICA 1:** SOUND e SSP-SIR (`tesa_sound`, `tesa_sspsir`), que também são aplicadas antes da filtragem.
+1. **TESA filtering is not FIR.** `tesa_filtbutter` uses a **fourth-order, zero-phase Butterworth IIR** (`filtfilt`) with a 4 Hz bandstop. Thus, `band=(58, 62)` matches the TESA approach for 60 Hz mains power.
+2. **Filtering occurs after ICA 1.** Removing the large muscle artifact before filtering reduces ringing. Cubic interpolation alone is insufficient; TESA follows the same principle.
+3. **Harmonics are not notched.** The 100 Hz low-pass removes frequencies at and above 120 Hz; only 60 Hz is covered by the notch.
+4. **SOUND and SSP-SIR (`tesa_sound`, `tesa_sspsir`) are alternatives to ICA 1 and are also applied before filtering.**
 
-## Equivalente no MNE
+## MNE equivalent
 
 ```python
 raw.notch_filter(60, method="iir",
@@ -34,4 +34,4 @@ raw.notch_filter(60, method="iir",
                  notch_widths=4, phase="zero")
 ```
 
-Na refatoração, sugiro oferecer `method="iir"` como opção compatível com o TESA e manter o notch **depois** da remoção de artefatos por ICA, SOUND ou SSP-SIR.
+For TESA compatibility, support `method="iir"` and apply the notch **after** artifact removal with ICA, SOUND, or SSP-SIR.

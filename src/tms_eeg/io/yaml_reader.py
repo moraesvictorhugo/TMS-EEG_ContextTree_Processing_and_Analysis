@@ -8,7 +8,7 @@ from tms_eeg.paths import decisions_file
 
 
 def load_decisions(config: ProjectConfig) -> dict:
-    """Load the decisions for the configured subject (única leitura do YAML)."""
+    """Load decisions for the configured subject."""
     if not re.fullmatch(r"V\d+", config.subject_id):
         raise ValueError(f"Invalid subject_id: {config.subject_id!r}")
 

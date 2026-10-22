@@ -28,19 +28,18 @@ class TEPPlotter:
         xlim: tuple = None,
         ylim: tuple = None,
     ):
-        """
-        Plota overlay dos evokeds médios por símbolo (8bit 0, 1, 2) para canais selecionados.
+        """Plot average evokeds by symbol (8-bit 0, 1, 2) for selected channels.
 
         Parameters
         ----------
         epochs : mne.Epochs
-            Objeto epochs filtrado com event IDs 1, 2, 3.
+            Filtered epochs with event IDs 1, 2, and 3.
         picks : list[str], optional
-            Canais a plotar. Default: roi_picks do config.
+            Channels to plot. Defaults to ``roi_picks`` from the config.
         xlim : tuple, optional
-            Janela temporal em segundos. Default: tep_xlim do config.
+            Time window in seconds. Defaults to ``tep_xlim`` from the config.
         ylim : tuple, optional
-            Limites do eixo Y em µV. Default: None (autoescala).
+            Y-axis limits in µV. Defaults to None (automatic scaling).
         """
         if not self.config.plot_analysis:
             return
@@ -48,12 +47,12 @@ class TEPPlotter:
         picks = picks or self.roi_picks
         xlim_ms = tuple(v * 1e3 for v in (xlim or self.xlim))
 
-        event_to_symbol = self.config.analysis_event_to_symbol  # {1: 0, 2: 1, 3: 2}
+        event_to_symbol = self.config.analysis_event_to_symbol
 
-        # Mapa inverso: event_id -> nome da condição (apenas dos eids relevantes)
+        # Map event IDs to condition names.
         eid_to_cond = {v: k for k, v in epochs.event_id.items()}
 
-        # Calcula evokeds por símbolo, já ordenados por símbolo (0, 1, 2)
+        # Compute evokeds in symbol order (0, 1, 2).
         evokeds = {}
         for eid, symbol in sorted(event_to_symbol.items(), key=lambda x: x[1]):
             cond = eid_to_cond.get(eid)
@@ -62,14 +61,14 @@ class TEPPlotter:
             evokeds[f"8bit {symbol}"] = epochs[cond].average(picks="eeg")
 
         if not evokeds:
-            print("Nenhuma condição encontrada para plotar.")
+            print("No conditions found to plot.")
             return
 
         colors = ["#1f77b4", "#ff7f0e", "#2ca02c"]
         labels = list(evokeds.keys())
-        times_ms = next(iter(evokeds.values())).times * 1e3  # eixo X compartilhado
+        times_ms = next(iter(evokeds.values())).times * 1e3
 
-        # Pré-extrai os dados de todos os canais de uma vez (evita .copy().pick() em loop)
+        # Cache channel data to avoid repeated copies and picks in the plotting loop.
         ch_data = {
             label: {
                 ch: evk.data[evk.ch_names.index(ch)] * 1e6
@@ -146,18 +145,18 @@ class TEPPlotter:
         picks: Optional[List[str]] = None,
     ):
         """
-        Compara TEPs de contextos selecionados (overlay no mesmo gráfico).
+        Compare selected context TEPs as overlays on shared axes.
 
         Parameters
         ----------
         context_epochs : dict
-            {context_name: mne.Epochs} retornado pelo ContextMapper.
+            Mapping of context names to ``mne.Epochs`` from ``ContextMapper``.
         contexts : list, optional
-            Quais contextos plotar. Default: ["ctx_01", "ctx_11", "ctx_21"].
+            Contexts to plot. Defaults to ``["ctx_01", "ctx_11", "ctx_21"]``.
         xlim : tuple, optional
-            Janela temporal em segundos.
+            Time window in seconds.
         picks : list, optional
-            Canais a plotar. Default: roi_picks do config.
+            Channels to plot. Defaults to ``roi_picks`` from the config.
         """
         if not self.config.plot_analysis:
             return
@@ -168,19 +167,19 @@ class TEPPlotter:
         picks = picks or self.roi_picks
         colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"]
 
-        # Gera evokeds
+        # Compute evokeds.
         evokeds = {}
         for ctx in contexts:
             if ctx not in context_epochs:
-                print(f"⚠ Contexto '{ctx}' não encontrado, pulando.")
+                print(f"⚠ Context '{ctx}' not found; skipping.")
                 continue
             evokeds[ctx] = context_epochs[ctx].average(picks="eeg")
 
         if len(evokeds) < 2:
-            print("Menos de 2 contextos disponíveis, nada a comparar.")
+            print("Fewer than two contexts available; nothing to compare.")
             return
 
-        # --- 1) Overlay por canal ROI ---
+        # --- 1) Overlay by ROI channel ---
         for ch in picks:
             fig, ax = plt.subplots(figsize=(9, 4))
             for i, (ctx, evk) in enumerate(evokeds.items()):
@@ -229,7 +228,7 @@ class TEPPlotter:
         plt.show()
         plt.close(fig)
 
-        # --- 3) Joint topomap por contexto ---
+        # --- 3) Joint topomap per context ---
         for ctx, evk in evokeds.items():
             fig = evk.plot_joint(
                 times=self.joint_times,

@@ -25,17 +25,17 @@ def load_data(config: ProjectConfig, data_type: str = "raw"):
         data = mne.read_epochs(file_path, preload=True)
 
     else:
-        raise ValueError(f"data_type inválido: '{data_type}'. Use 'raw' or 'epochs'.")
+        raise ValueError(f"Invalid data_type: '{data_type}'. Use 'raw' or 'epochs'.")
 
     return data
 
 
 def get_raw_path(config: ProjectConfig) -> str:
-    """Retorna o caminho do arquivo .bdf raw original para o sujeito."""
+    """Return the subject's original raw BDF file path."""
     subject_raw_dir = raw_dir(config.subject_id)
     bdf_files = list(subject_raw_dir.glob("*.bdf"))
     if not bdf_files:
         raise FileNotFoundError(
-            f"Nenhum .bdf encontrado em {subject_raw_dir}"
+            f"No .bdf file found in {subject_raw_dir}"
         )
     return str(bdf_files[0])

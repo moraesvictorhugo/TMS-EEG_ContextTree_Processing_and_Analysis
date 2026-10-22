@@ -14,12 +14,12 @@ from tms_eeg.visualization.tep_plots import TEPPlotter
 setup_plotting_backend()
 
 '''
-# To-do:
+# TODO:
 
-1 - Define first subject's validation based on criterias as:
+1 - Define validation criteria for the first subject:
     - Are MEPs different between 0, 1 and 2?
     - Are MEPs > 50 uV in 1?
-    - EEG muscle artifact was succesfully removed?
+    - Was the EEG muscle artifact successfully removed?
     
 2 - Features
     - Mean amplitude in P30
@@ -33,12 +33,12 @@ setup_plotting_backend()
 3 - Electrodes
     - All of them? or clustered?
 
-4 - Define TEP comparisions for time, frequency and time-frequency domains:
+4 - Define TEP comparisons in the time, frequency, and time-frequency domains:
     - Is the TEP response the same in 1 expected (context 21) and 1 unexpected (ctx 01)?
     - Is the TEP response the same in 1 after a predictable 2 (context 21) and 1 after unpredictable (ctx 11)?
     - Are the TEP response in contexts 01, 11 and 21 different? The question here is focused in what was the previous pulse
-    - Are there any adaptation in 21 context over time? Compare the first 1/3 od 21 with the last 1/3 21 context
-    - Are there any adaptation in 11 context over time? Compare the first 1/3 od 11 with the last 1/3 11 context
+    - Is there adaptation over time in context 21? Compare its first and last thirds.
+    - Is there adaptation over time in context 11? Compare its first and last thirds.
 
 
 X - Export a long format table for statistics with columns as:
@@ -50,11 +50,10 @@ X - Export a long format table for statistics with columns as:
     - Number of times this context appeared
     - Predictability of this context
     - Interval to previous pulse
-    - Interval to previous same intensity pulse (usefull???)
-    - pre-pulse cortical state (how???)
-    - features selected post pulse (what???)
-    - Volunteer classified as invalid must be included in analisys and export but with a identifier column
-    - add a column for included/excluded volunteer and another for reason
+    - Interval since the previous pulse of the same intensity
+    - Pre-pulse cortical state
+    - Selected post-pulse features
+    - Include invalid participants with an identifier and inclusion status/reason
     - 
 
 
@@ -69,7 +68,7 @@ for subject_id in subjects:
     config = ProjectConfig(subject_id=subject_id)
     epochs = load_data(config, data_type="epochs")
 
-    # ── Renomear condições ───────────────────────────────────────────
+    # ── Rename conditions ────────────────────────────────────────────
     label_map = {k.lower(): str(v) for k, v in config.analysis_name_to_symbol.items()}
     epochs.event_id = {label_map[k.lower()]: v for k, v in epochs.event_id.items()}
 
@@ -83,27 +82,26 @@ for subject_id in subjects:
     mfp_plotter = MFPPlotter(times=epochs.times, config=config)
 
     # ================================================================ #
-    #  PART 1 — ANÁLISE POR CONDIÇÃO (8Bit 1 / 2 / 3)
+    #  PART 1 — CONDITION-LEVEL ANALYSIS (8Bit 1 / 2 / 3)
     # ================================================================ #
 
-    # (Cálculos de peak-to-peak / GMFP / LMFP por condição — ver histórico
-    #  do git para as versões comentadas anteriores.)
+    # Condition-level peak-to-peak, GMFP, and LMFP calculations are not currently run.
 
     # ================================================================ #
-    #  PART 2 — ANÁLISE POR CONTEXTO (árvore de contexto)
+    #  PART 2 — CONTEXT-LEVEL ANALYSIS (context tree)
     # ================================================================ #
 
     raw_path = get_raw_path(config)
     context_mapper = ContextMapper(config)
     context_epochs = context_mapper.get_context_epochs(epochs, raw_path)
 
-    # ── Evokeds por contexto (ROI) ──────────────────────────────────
+    # ── Context evokeds ──────────────────────────────────────────────
     ctx_evokeds = {
         ctx_name: ctx_ep.average().pick(config.analysis_channels_of_interest)
         for ctx_name, ctx_ep in context_epochs.items()
     }
 
-    # ── TEP plots por contexto ───────────────────────────────────────
+    # ── Context TEP plots ────────────────────────────────────────────
     tep_plotter.plot_mean_tep(evokeds=ctx_evokeds)
 
     # ── Contexts comparison ──────────────────────────────────────────

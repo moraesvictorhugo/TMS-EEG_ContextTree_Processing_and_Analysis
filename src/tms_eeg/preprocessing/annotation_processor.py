@@ -23,17 +23,15 @@ class TextFileParser:
     def find_text_file(self) -> Optional[Path]:
         """Find the text file with trial conditions in the subject's data folder."""
         try:
-            # Look for .txt files in the subject's data folder
             txt_files = list(self.data_dir.glob("*.txt"))
             
             if not txt_files:
                 return None
             
-            # Return the first .txt file found
             return txt_files[0]
             
         except Exception as e:
-            print(f"Error finding text file: {e}")
+            print(f"Error locating the condition text file: {e}")
             return None
     
     def parse_trial_conditions(self, text_file: Path) -> List[str]:
@@ -83,10 +81,10 @@ class AnnotationProcessor:
         has_8bit_triggers = self._check_8bit_triggers(raw)
         
         if has_8bit_triggers:
-            print("Found 8-bit trigger annotations. Using them for condition labeling.")
+            print("Found 8-bit trigger annotations; using them to label conditions.")
             raw_processed = self._replace_with_8bit_labels(raw)
         else:
-            print("No 8-bit trigger annotations found. Checking for text file fallback.")
+            print("No 8-bit trigger annotations found; checking the text-file fallback.")
             raw_processed = self._replace_with_text_file_labels(raw)
         
         return raw_processed
@@ -94,7 +92,6 @@ class AnnotationProcessor:
     def _check_8bit_triggers(self, raw: mne.io.Raw) -> bool:
         """Check if 8-bit trigger annotations exist in the data."""
         try:
-            # Look for 8-bit trigger annotations
             annotations = raw.annotations
             trigger_annotations = [desc for desc in annotations.description 
                                  if desc.startswith('8Bit')]
@@ -169,7 +166,7 @@ class AnnotationProcessor:
                     
                     print(f"Replaced Stimulus A at {stim_time:.3f}s with {new_label}")
                 else:
-                    print(f"No 8-bit trigger found near Stimulus A at {stim_time:.3f}s")
+                        print(f"No 8-bit trigger found near Stimulus A at {stim_time:.3f} s.")
             
             # Build new annotations excluding matched 8-bit triggers
             keep_mask = np.array([
@@ -196,7 +193,7 @@ class AnnotationProcessor:
             return raw_processed
             
         except Exception as e:
-            print(f"Error replacing with 8-bit labels: {e}")
+            print(f"Error replacing 8-bit labels: {e}")
             return raw
     
     def _replace_with_text_file_labels(self, raw: mne.io.Raw) -> mne.io.Raw:
@@ -209,23 +206,20 @@ class AnnotationProcessor:
             Raw data with Stimulus A replaced by text file conditions
         """
         try:
-            # Find text file
             text_file = self.text_parser.find_text_file()
             
             if text_file is None:
-                print("No text file found. Keeping original Stimulus A annotations.")
+                print("No condition text file found; keeping the original Stimulus A annotations.")
                 return raw
             
             print(f"Found text file: {text_file}")
             
-            # Parse trial conditions from text file
             conditions = self.text_parser.parse_trial_conditions(text_file)
             
             if not conditions:
-                print("No valid conditions found in text file. Keeping original annotations.")
+                print("No valid conditions found in the text file; keeping the original annotations.")
                 return raw
             
-            # Get Stimulus A events using safer approach
             stimulus_a_indices = []
             stimulus_a_times = []
             for i, desc in enumerate(raw.annotations.description):
@@ -234,43 +228,37 @@ class AnnotationProcessor:
                     stimulus_a_times.append(raw.annotations.onset[i])
             
             if not stimulus_a_indices:
-                print("No Stimulus A events found. Cannot apply text file mapping.")
+                print("No Stimulus A events found; cannot apply the text-file mapping.")
                 return raw
             
-            # Ensure we have enough conditions for all Stimulus A events
             if len(conditions) < len(stimulus_a_indices):
-                print(f"Warning: Only {len(conditions)} conditions in text file, "
-                      f"but {len(stimulus_a_indices)} Stimulus A events. "
-                      f"Repeating conditions to fill remaining events.")
+                print(f"Warning: The text file contains {len(conditions)} conditions, "
+                      f"but there are {len(stimulus_a_indices)} Stimulus A events. "
+                      f"Repeating conditions to fill the remaining events.")
                 
-                # Repeat conditions to match number of Stimulus A events
                 conditions = (conditions * 
                              (len(stimulus_a_indices) // len(conditions) + 1))[
                              :len(stimulus_a_indices)]
             
-            # Create new descriptions (start with original)
             new_descriptions = list(raw.annotations.description)
             
-            # Replace Stimulus A events with text file conditions
             for i, stim_idx in enumerate(stimulus_a_indices):
                 if i < len(conditions):
                     new_descriptions[stim_idx] = conditions[i]
-                    print(f"Replaced Stimulus A at {raw.annotations.onset[stim_idx]:.3f}s "
-                          f"with {conditions[i]}")
+                    print(f"Replaced Stimulus A at {raw.annotations.onset[stim_idx]:.3f} s "
+                          f"with {conditions[i]}.")
             
-            # Create new annotations
             new_annotations = mne.Annotations(
                 onset=raw.annotations.onset,
                 duration=raw.annotations.duration,
                 description=new_descriptions
             )
             
-            # Create new raw object with updated annotations
             raw_processed = raw.copy()
             raw_processed.set_annotations(new_annotations)
             
             return raw_processed
             
         except Exception as e:
-            print(f"Error replacing with text file labels: {e}")
+            print(f"Error replacing labels from the text file: {e}")
             return raw

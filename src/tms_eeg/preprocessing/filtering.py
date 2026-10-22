@@ -4,17 +4,17 @@ from mne._fiff.pick import _picks_to_idx
 
 
 def _filter_kwargs(method: str = "fir", iir_order: int = 4) -> dict:
-    """Parâmetros comuns FIR/IIR (sempre zero-phase)."""
+    """Return shared zero-phase FIR/IIR parameters."""
     if method == "fir":
         return {"method": "fir", "phase": "zero", "fir_design": "firwin"}
     if method == "iir":
-        # Butterworth + filtfilt (zero-phase), igual ao pop_tesa_filtbutter
+        # Zero-phase Butterworth filtering, equivalent to TESA's pop_tesa_filtbutter.
         return {
             "method": "iir",
             "phase": "zero",
             "iir_params": dict(order=iir_order, ftype="butter", output="sos"),
         }
-    raise ValueError(f"method deve ser 'fir' ou 'iir', recebido '{method}'.")
+    raise ValueError(f"method must be 'fir' or 'iir', got '{method}'.")
 
 
 def _load(inst):
@@ -22,7 +22,7 @@ def _load(inst):
 
 
 def bandpass(inst, band, ch_type: str, method: str = "fir", iir_order: int = 4):
-    """Bandpass/highpass/lowpass zero-phase (FIR ou IIR Butterworth).
+    """Apply zero-phase FIR or IIR Butterworth bandpass, high-pass, or low-pass filtering.
 
     band=(1, None) -> highpass | (None, 80) -> lowpass | (1, 80) -> bandpass
     """
@@ -38,10 +38,10 @@ def bandpass(inst, band, ch_type: str, method: str = "fir", iir_order: int = 4):
 
 def iir_bandstop(inst, band, ch_type: str | list[str] | None = None,
                  iir_order: int = 4):
-    """Bandstop Butterworth zero-phase (equivalente ao 'bandstop' do TESA).
+    """Apply zero-phase Butterworth bandstop filtering, as in TESA.
 
-    Ex.: band=(58, 62). No MNE, l_freq > h_freq gera bandstop.
-    Funciona em Raw, Epochs e Evoked.
+    Example: ``band=(58, 62)``. In MNE, ``l_freq > h_freq`` selects bandstop.
+    Supports Raw, Epochs, and Evoked.
     """
     low, high = band
     return _load(inst).filter(
@@ -54,7 +54,7 @@ def iir_bandstop(inst, band, ch_type: str | list[str] | None = None,
 
 
 def _notch_params(sfreq, notch_freqs, band=None, harmonics=1, width=None):
-    """Calcula as frequências (com harmônicos) e as larguras do notch."""
+    """Calculate notch frequencies, including harmonics, and their widths."""
     nyq = sfreq / 2
 
     if band is not None:
@@ -62,7 +62,7 @@ def _notch_params(sfreq, notch_freqs, band=None, harmonics=1, width=None):
         bases, width = [(low + high) / 2], high - low
     else:
         bases = [notch_freqs] if isinstance(notch_freqs, (int, float)) else list(notch_freqs)
-        # width=None -> padrão do MNE (freq / 200)
+        # If width is None, MNE uses its default (frequency / 200).
 
     freqs = np.array([f * h for f in bases
                       for h in range(1, harmonics + 1) if f * h < nyq])
@@ -72,10 +72,10 @@ def _notch_params(sfreq, notch_freqs, band=None, harmonics=1, width=None):
 def notch_filter(inst, notch_freqs, ch_type: str | list[str] | None = None,
                  band=None, harmonics=1, method: str = "fir",
                  width: float | None = None, iir_order: int = 4):
-    """Notch zero-phase (FIR ou IIR Butterworth) em Raw, Epochs ou Evoked.
+    """Apply zero-phase FIR or IIR Butterworth notch filtering.
 
-    Para IIR estilo TESA use method='iir', width=4 (ex.: 58-62 Hz).
-    ch_type=None filtra todos os canais de dados.
+    For TESA-style IIR filtering, use ``method='iir'`` and ``width=4``.
+    If ``ch_type`` is None, all data channels are filtered.
     """
     inst = _load(inst)
     freqs, width = _notch_params(inst.info["sfreq"], notch_freqs, band,
@@ -84,7 +84,7 @@ def notch_filter(inst, notch_freqs, ch_type: str | list[str] | None = None,
         return inst
 
     if method == "iir" and width is None:
-        width = 4.0  # freq/200 é estreito demais para Butterworth
+        width = 4.0  # MNE's default is too narrow for Butterworth filtering.
 
     picks = _picks_to_idx(
         inst.info, ch_type if ch_type is not None else "data",
@@ -99,7 +99,7 @@ def notch_filter(inst, notch_freqs, ch_type: str | list[str] | None = None,
     if isinstance(inst, mne.io.BaseRaw):
         return inst.notch_filter(picks=picks, **kwargs)
 
-    # Epochs / Evoked: não têm .notch_filter()
+    # Epochs and Evoked do not provide a notch_filter method.
     is_epochs = isinstance(inst, mne.BaseEpochs)
     data = inst.get_data(copy=True) if is_epochs else np.asarray(inst.data)
 

@@ -71,8 +71,8 @@ class EEGICA:
     def apply_ica(self, epochs: mne.Epochs) -> mne.Epochs:
         """Apply ICA artifact rejection to a copy of the epochs.
 
-        As componentes a remover vêm de ``apply_ica_exclude``
-        (``ica_exclude`` no YAML de decisões).
+        Components to remove are set by ``apply_ica_exclude`` from the
+        ``ica_exclude`` field in the decisions YAML.
         """
         if self.ica is None:
             return epochs

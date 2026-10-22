@@ -107,12 +107,12 @@ def export_epochs_to_decisions(
 ) -> Path:
     """Persist the full epoch index/annotation sequence in the decisions YAML.
 
-    Deve ser chamado ANTES da remoção de épocas — registra em ``epochs_record``
-    o ``epochs.selection`` e o rótulo (anotação) de cada época.
+    Call before dropping epochs to record ``epochs.selection`` and each
+    epoch's annotation in ``epochs_record``.
 
     Args:
         config: Project configuration.
-        epochs: Epochs object (registro completo, sem drops).
+        epochs: Complete Epochs object before any drops.
 
     Returns:
         Path of the updated YAML file.

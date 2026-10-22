@@ -155,7 +155,6 @@ epochs_emg_filtered = notch_filter(
 # epochs_eeg_filtered_test = ArtifactRemover(config).remove_tms_artifact(epochs_eeg_filtered.copy(), mode="tesa")
 
 # Check TEP quality
-tep_plotter = TEPPlotter(config)
 tep_plotter.plot_evoked_by_symbol(
     epochs_eeg_filtered,
     picks=["FC1", "C3", "C4"],

@@ -20,8 +20,30 @@ def load_data(config: ProjectConfig, data_type: str = "raw"):
         data = mne.io.read_raw_bdf(file_path, preload=True)
 
     elif data_type == "epochs":
-        epochs_dir = processed_dir(config.subject_id) / "processed_full"
-        file_path = next(epochs_dir.glob("*_epochs_processed.fif"))
+        subject_processed_dir = processed_dir(config.subject_id)
+        mode_folder = {
+            "tep": "processed_tep",
+            "context_tree": "processed_context_tree",
+        }.get(config.mode)
+
+        if mode_folder is None:
+            raise ValueError(
+                f"Unsupported processing mode {config.mode!r}; "
+                "expected 'tep' or 'context_tree'."
+            )
+
+        epochs_dir = subject_processed_dir / mode_folder
+
+        file_pattern = "*_epochs_processed.fif"
+        file_path = next(
+            iter(sorted(epochs_dir.glob(file_pattern))),
+            None,
+        )
+        if file_path is None:
+            raise FileNotFoundError(
+                f"No processed epochs found for subject {config.subject_id!r}. "
+                f"Searched {file_pattern!r} in: {epochs_dir}"
+            )
         data = mne.read_epochs(file_path, preload=True)
 
     else:

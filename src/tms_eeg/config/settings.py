@@ -65,6 +65,23 @@ class ProjectConfig:
         "V04", "V05", "V04", "V07", "V08", "V09"])
     analysis_channels_of_interest: list = field(default_factory=lambda: [
         "FC1", "FC5", "C3", "CP1", "CP5"])
+    analysis_rois: dict = field(default_factory=lambda: {
+        "frontal_left": ["F3", "F7"],
+        "frontal_right": ["F4", "F8"],
+        "sensori_motora_left": ["FC1", "FC5", "C3", "CP1", "CP5"],
+        "sensori_motora_right": ["FC2", "FC6", "C4", "CP2", "CP6"],
+        "parietal_left": ["P3", "P7"],
+        "parietal_right": ["P4", "P8"],
+        "occipital_left": ["O1", "PO3"],
+        "occipital_right": ["O2", "PO4"],
+        "temporal_left": ["T7"],
+        "temporal_right": ["T8"],
+        "Fz": ["Fz"],
+        "Cz": ["Cz"],
+        "Pz": ["Pz"],
+        "frontopolar_left": ["Fp1", "AF3"],
+        "frontopolar_right": ["Fp2", "AF4"],
+    })
     analysis_time_windows: dict = field(default_factory=lambda: {
         "N15":  (0.012, 0.020),
         "P30":  (0.020, 0.040),

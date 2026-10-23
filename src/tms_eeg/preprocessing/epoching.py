@@ -40,22 +40,11 @@ def find_events(raw: mne.io.BaseRaw, config: ProjectConfig) -> tuple[np.ndarray,
         # Build regexp to match only the resolved labels
         pattern = "|".join(re.escape(k) for k in resolved_id)
         try:
-            events, event_id = mne.events_from_annotations(
-                raw, regexp=pattern,
+            # Assign study codes directly, including when a condition is absent.
+            # Sequential in-place remapping can accidentally remap a code twice.
+            events, final_event_id = mne.events_from_annotations(
+                raw, event_id=resolved_id, regexp=pattern,
             )
-            # Remap event_id values to our resolved indices
-            final_event_id = {}
-            for ann_label, mne_idx in event_id.items():
-                matched = str(ann_label).lower()
-                for res_label, res_idx in resolved_id.items():
-                    if res_label.lower() == matched:
-                        final_event_id[ann_label] = res_idx
-                        break
-
-            # Remap event codes in the events array
-            for ann_label, mne_idx in event_id.items():
-                if ann_label in final_event_id:
-                    events[events[:, 2] == mne_idx, 2] = final_event_id[ann_label]
 
             print(f"[find_events] Using 8bit event_id: {final_event_id}")
             return events, final_event_id

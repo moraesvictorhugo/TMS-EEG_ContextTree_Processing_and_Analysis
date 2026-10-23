@@ -52,13 +52,14 @@ class TextFileParser:
                 for line in f:
                     line = line.strip()
                     if line:  # Skip empty lines
+                        if line not in {"0", "1", "2"}:
+                            raise ValueError(f"Invalid study symbol {line!r}; expected 0, 1 or 2.")
                         conditions.append(f"8bit {int(line) +1}")
             
             return conditions
             
         except Exception as e:
-            print(f"Error parsing text file {text_file}: {e}")
-            return []
+            raise ValueError(f"Invalid condition file {text_file}: {e}") from e
 
 
 class AnnotationProcessor:
@@ -87,6 +88,12 @@ class AnnotationProcessor:
             print("No 8-bit trigger annotations found; checking the text-file fallback.")
             raw_processed = self._replace_with_text_file_labels(raw)
         
+        unresolved = sum(desc == 'Stimulus A' for desc in raw_processed.annotations.description)
+        if unresolved:
+            raise ValueError(
+                f"{unresolved} Stimulus A events remain unlabeled. "
+                "Check trigger matching or the condition file before epoching."
+            )
         return raw_processed
     
     def _check_8bit_triggers(self, raw: mne.io.Raw) -> bool:
@@ -193,8 +200,7 @@ class AnnotationProcessor:
             return raw_processed
             
         except Exception as e:
-            print(f"Error replacing 8-bit labels: {e}")
-            return raw
+            raise ValueError("Could not replace 8-bit labels; inspect the annotations.") from e
     
     def _replace_with_text_file_labels(self, raw: mne.io.Raw) -> mne.io.Raw:
         """Replace Stimulus A annotations using text file mapping.
@@ -260,5 +266,4 @@ class AnnotationProcessor:
             return raw_processed
             
         except Exception as e:
-            print(f"Error replacing labels from the text file: {e}")
-            return raw
+            raise ValueError("Could not label pulses from the condition file.") from e

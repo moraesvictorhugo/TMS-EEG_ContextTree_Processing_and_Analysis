@@ -17,7 +17,31 @@ def load_decisions(config: ProjectConfig) -> dict:
         raise FileNotFoundError(f"[decisions] File not found: {path}")
 
     with path.open(encoding="utf-8") as file:
-        return yaml.safe_load(file) or {}
+        decisions = yaml.safe_load(file)
+    validate_decisions(decisions)
+    return decisions
+
+
+def validate_decisions(decisions: dict) -> None:
+    """Require explicit lists; [] means reviewed with no exclusions for that field.
+
+    This validates structure, not scientific approval or the review date.
+    Dataset-specific bounds are checked when exclusions are applied.
+    """
+    if not isinstance(decisions, dict):
+        raise ValueError("Decisions must be a YAML mapping, not empty or a placeholder.")
+    for key in ("bad_channels", "bad_epochs", "ica_exclude"):
+        values = decisions.get(key)
+        if not isinstance(values, list):
+            raise ValueError(f"Decision {key!r} must be an explicit list; use [] for none.")
+        if key == "bad_channels":
+            valid = all(isinstance(value, str) and value.strip() for value in values)
+        else:
+            valid = all(type(value) is int and value >= 0 for value in values)
+        if not valid:
+            raise ValueError(f"Invalid {key}: {values!r}. Replace placeholders with valid entries.")
+        if len(values) != len(set(values)):
+            raise ValueError(f"Duplicate entries in {key}: {values!r}")
 
 
 def save_epochs_record(
@@ -40,6 +64,8 @@ def save_epochs_record(
     Returns:
         Path of the updated YAML file.
     """
+    if len(indexes) != len(annotations):
+        raise ValueError("Epoch indices and annotation labels must have equal lengths.")
     path = decisions_file(config.subject_id)
     lines = (
         path.read_text(encoding="utf-8").splitlines(keepends=True)

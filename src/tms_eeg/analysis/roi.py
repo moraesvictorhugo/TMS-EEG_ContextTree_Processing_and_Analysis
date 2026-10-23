@@ -51,4 +51,7 @@ def create_roi_epochs(epochs: mne.Epochs, rois: dict) -> mne.Epochs:
         events=epochs.events,
         event_id=epochs.event_id,
         tmin=epochs.tmin,
+        metadata=epochs.metadata.copy() if epochs.metadata is not None else None,
+        selection=epochs.selection.copy(),
+        drop_log=epochs.drop_log,
     )

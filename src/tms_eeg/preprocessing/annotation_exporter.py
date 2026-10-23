@@ -83,6 +83,7 @@ class EpochAnnotationExporter:
         epochs: mne.Epochs,
         symbols: np.ndarray,
         subfolder: str = "processed",
+        window: tuple = (0.015, 0.450),
     ) -> None:
         """Save ``epochs`` to a MATLAB ``.mat`` file using ``Writer``.
 
@@ -97,8 +98,12 @@ class EpochAnnotationExporter:
         subfolder : str, optional
             Destination subfolder inside the processed directory (default
             ``"processed"``).
+        window : tuple
+            Crop bounds in seconds, forwarded unchanged to the writer.
         """
-        writer.save_epochs_to_mat(epochs, symbol_sequence=symbols, subfolder=subfolder)
+        writer.save_epochs_to_mat(
+            epochs, symbol_sequence=symbols, subfolder=subfolder, window=window
+        )
 
 
 def export_epochs_to_decisions(

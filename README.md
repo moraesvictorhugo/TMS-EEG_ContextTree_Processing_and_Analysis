@@ -144,7 +144,9 @@ data/raw/<subject>_data/
 
 The reader loads a BDF from that directory. A condition text file can provide the stimulus sequence when condition annotations are unavailable.
 
-The current raw and text readers select the first matching file. Keep inputs unambiguous. Multiple matching files do not provide explicit block handling.
+Raw and processed-epoch readers reject multiple matching files. The text fallback
+still selects the first text file; keep those inputs unambiguous pending the recovery
+policy in to-solve.md (S10). Multiple files do not provide explicit block handling.
 
 ### Annotations, event codes, and symbols
 
@@ -269,7 +271,9 @@ The MATLAB variable `data` contains:
 - `X_ter`: a `1 × N` row vector of study symbols.
 - `Y_ter`: a `2 × N_channels` cell array. Row 1 contains channel names; row 2 contains sample-by-epoch matrices in microvolts.
 
-The script currently passes a `window` argument that `EpochAnnotationExporter.export_to_mat()` does not accept. Resolve that interface before running this branch, then verify actual crop windows and symbol-to-epoch alignment.
+The exporter now accepts and forwards `window`. V00 checks verify both crop windows
+and MATLAB dimensions/units. Export requires one valid symbol per retained epoch;
+confirm source mode and original identities before running this branch.
 
 ### 5. Features and visualization
 
@@ -353,13 +357,24 @@ uv run python scripts/02_create_ROIs.py
 uv run python scripts/04_tep_features.py
 ```
 
-MATLAB export is a separate branch requiring the interface correction described above. Statistics and final R plotting scripts are reserved entry points.
+MATLAB export is a separate branch; its window interface is corrected, but source
+mode and trial alignment still require review. Statistics and final R plotting
+scripts are reserved entry points.
 
 Subject paths resolve from the repository root through `paths.py`. The configured database CSV path is relative to the working directory; run commands from the repository root.
 
 ## Validation expectations
 
-No automated test suite or CI configuration is currently included.
+Phase 1 development checks now use the shortened V00 recording. See
+[baseline-v00.md](baseline-v00.md) for observed behavior, simple execution instructions,
+intentional safeguards, and the known identity mismatch in the existing saved ROI
+file. Run `uv run python scripts/check_v00.py` from the repository root, or execute
+its ordinary Python lines in the interactive window. No notebooks, cell markers or
+testing framework are required. Checks do not run full preprocessing or overwrite
+existing decisions/results. Open methodological reminders are preserved in
+[to-solve.md](to-solve.md); later phases are deferred in [to-do.md](to-do.md).
+
+No testing framework or CI configuration is currently included.
 
 Use focused numerical checks and representative recordings to validate changes. Depending on the change, check:
 

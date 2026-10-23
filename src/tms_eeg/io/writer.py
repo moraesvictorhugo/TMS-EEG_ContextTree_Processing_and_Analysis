@@ -114,7 +114,7 @@ class Writer:
         epochs : mne.Epochs
             Epochs object (data assumed in Volts, MNE default).
         symbol_sequence : np.ndarray
-            1-D array of context-tree symbols (length can differ from n_epochs).
+            1-D array of study symbols, one per epoch in the same order.
         subfolder : str
             Subfolder within processed dir.
         window : tuple
@@ -123,6 +123,17 @@ class Writer:
         if not self.config.io_export_data:
             print("Export skipped: export_data is set to False in configuration")
             return
+
+        symbols = np.asarray(symbol_sequence)
+        if symbols.ndim != 1 or len(symbols) != len(epochs):
+            raise ValueError("MATLAB export requires one symbol per epoch, in epoch order.")
+        if not np.isin(symbols, list(self.config.analysis_name_to_symbol.values())).all():
+            raise ValueError("MATLAB export received an invalid study symbol.")
+        if len(window) != 2 or window[0] >= window[1]:
+            raise ValueError("MATLAB window must contain increasing (tmin, tmax) in seconds.")
+        half_sample = 0.5 / epochs.info["sfreq"]
+        if window[0] < epochs.tmin - half_sample or window[1] > epochs.tmax + half_sample:
+            raise ValueError("MATLAB window extends outside the available epochs.")
 
         # --- 1. Pick EEG channels and crop to desired window ---
         ep = epochs.copy().pick("eeg").crop(tmin=window[0], tmax=window[1])

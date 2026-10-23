@@ -35,10 +35,10 @@ def load_data(config: ProjectConfig, data_type: str = "raw"):
         epochs_dir = subject_processed_dir / mode_folder
 
         file_pattern = "*_epochs_processed.fif"
-        file_path = next(
-            iter(sorted(epochs_dir.glob(file_pattern))),
-            None,
-        )
+        matches = sorted(epochs_dir.glob(file_pattern))
+        if len(matches) > 1:
+            raise ValueError(f"Ambiguous epochs input in {epochs_dir}: {matches}")
+        file_path = matches[0] if matches else None
         if file_path is None:
             raise FileNotFoundError(
                 f"No processed epochs found for subject {config.subject_id!r}. "
@@ -55,9 +55,11 @@ def load_data(config: ProjectConfig, data_type: str = "raw"):
 def get_raw_path(config: ProjectConfig) -> str:
     """Return the subject's original raw BDF file path."""
     subject_raw_dir = raw_dir(config.subject_id)
-    bdf_files = list(subject_raw_dir.glob("*.bdf"))
+    bdf_files = sorted(subject_raw_dir.glob("*.bdf"))
     if not bdf_files:
         raise FileNotFoundError(
             f"No .bdf file found in {subject_raw_dir}"
         )
+    if len(bdf_files) > 1:
+        raise ValueError(f"Ambiguous raw input in {subject_raw_dir}: {bdf_files}")
     return str(bdf_files[0])

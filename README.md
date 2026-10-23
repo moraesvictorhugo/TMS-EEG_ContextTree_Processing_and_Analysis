@@ -1,496 +1,380 @@
 # TMS-EEG Context Tree Processing and Analysis
 
-**Created for PD-NEUROMAT research group**
+This repository supports the PD-NEUROMAT study of how TMS intensity and stimulus history influence TMS-evoked potentials (TEPs). EEG recordings provide cortical responses; EMG recordings provide motor-evoked potentials (MEPs) for evaluating motor responses.
 
-A comprehensive Python package for processing and analyzing Transcranial Magnetic Stimulation combined with Electroencephalography (TMS-EEG) data using context tree methodology. This project enables researchers to investigate how brain responses to TMS pulses vary based on different stimulus contexts and sequences.
+This README provides the study definitions, data conventions, and development principles needed for researchers and AI assistants to continue the project. Experimental definitions are authoritative. Processing defaults describe the current implementation and may change as methods are agreed.
 
-## 🧠 Research Context
+## Study definitions
 
-This project analyzes TMS-evoked potentials (TEPs) in the context of varying stimulus sequences to understand how the brain's response to identical stimuli changes based on preceding context. The context tree analysis allows for examining neural adaptation, prediction, and information processing in response to structured stimulus sequences.
+### Experimental design
 
-## 🚀 Key Features
+Each volunteer receives **two blocks of 200 trials**, totaling **400 TMS pulses**.
 
-- **Comprehensive Preprocessing**: TMS artifact removal, filtering, epoching, ICA decomposition
-- **Context Tree Analysis**: Analyzes EEG responses based on different stimulus contexts and sequences
-- **TEP Analysis**: Peak-to-peak amplitude calculation, Global/Local Mean Field Power (GMFP/LMFP) analysis
-- **Advanced Visualization**: Time-evoked potentials, GFP plots, context comparison plots
-- **Group Analysis**: Aggregates results across multiple subjects for statistical analysis
-- **Flexible Configuration**: Dataclass-based configuration system for easy customization
-- **MATLAB Integration**: Optional SOUND artifact removal algorithm support
+| Stimulus symbol | TMS intensity |
+|---|---|
+| `0` | 80% resting motor threshold (rMT) |
+| `1` | 100% rMT |
+| `2` | 120% rMT |
 
-## 📋 Table of Contents
+Pulse sequences follow a context-tree model. A **context** is the minimum amount of stimulus history needed to predict the next event.
 
-- [Installation](#installation)
-- [Project Structure](#project-structure)
-- [Quick Start](#quick-start)
-- [Configuration](#configuration)
-- [Usage](#usage)
-  - [Preprocessing](#preprocessing)
-  - [Analysis](#analysis)
-  - [Group Analysis](#group-analysis)
-- [Data Processing Pipeline](#data-processing-pipeline)
-- [Dependencies](#dependencies)
-- [Troubleshooting](#troubleshooting)
+The model uses contexts `0`, `01`, `11`, `21`, and `2`:
 
-## 📦 Installation
+| Context ending at the current pulse | Next pulse |
+|---|---|
+| `0` | `2` with 70% probability; `1` with 30% probability |
+| `01` | `1`, deterministically |
+| `11` | `0`, deterministically |
+| `21` | `0`, deterministically |
+| `2` | `1`, deterministically |
 
-### Requirements
+An example sequence is:
 
-- Python 3.11+
-- Operating System: Linux, macOS, or Windows
+```text
+2 → 1 → 0 → 2 → 1 → 0 → 1 → 1 → 0
+```
 
-### Using uv (Recommended)
+The probabilistic choice occurs after `0`; the other transitions follow the table.
+
+The initial stimulus and treatment of block boundaries are not specified in this document. Confirm these from the experimental protocol before implementing sequence generation or block-aware context assignment.
+
+### Context notation and response selection
+
+Context symbols are ordered **from past to present**.
+
+For response analysis, the context ends at the pulse whose evoked response is analyzed:
+
+| Analysis context | Response selected |
+|---|---|
+| `0` | Response following pulse `0` |
+| `01` | Response following `1`, immediately preceded by `0` |
+| `11` | Response following `1`, immediately preceded by `1` |
+| `21` | Response following `1`, immediately preceded by `2` |
+| `2` | Response following pulse `2` |
+
+For example, context `21` predicts a subsequent `0` during sequence generation. However, the response analyzed for context `21` is evoked by its final pulse, `1`.
+
+**Context assignment must use the original stimulus sequence.** Rejecting an EEG epoch must never make originally nonadjacent pulses become neighbors. Preserve original event identities through selection and transformation.
+
+### Research questions
+
+The study investigates:
+
+- Whether responses to intensity `1` differ between contexts `01`, `11`, and `21`.
+- How response differences relate to the sequence’s predictability rules.
+- Whether responses change with repeated context occurrences, including comparisons of early and late occurrences.
+- How electrode-level and region-of-interest (ROI) analyses characterize these effects.
+- How MEP amplitudes vary across intensities and support evaluation of each volunteer’s responses.
+
+These are research objectives. Their presence here does not imply that every analysis is implemented.
+
+### Participants and inclusion
+
+The workflow is intended to analyze every volunteer who participated in the study. The configured subject list selects which subjects to process; it does not establish final inclusion.
+
+Post hoc exclusion criteria are being defined. An absence of MEP amplitude differences across intensities `0`, `1`, and `2` is a candidate criterion.
+
+Do not infer a statistical test, threshold, or automatic exclusion rule from this proposal. Participant inclusion decisions and their reasons must remain traceable for reporting.
+
+## Development principles
+
+Keep the project understandable to a researcher with limited Python experience who needs to inspect intermediate results, modify processing steps, and debug the workflow.
+
+- Prefer explicit scientific Python and a visible processing sequence.
+- Use functions and modules to clarify responsibilities and remove meaningful repetition.
+- Add classes or abstractions only when they solve a concrete need.
+- Extend the existing package and numbered scripts before introducing frameworks or generalized pipeline infrastructure.
+- Preserve stimulus meanings, original event order, epoch identity, units, and subject decision records.
+- Ask the researcher before choosing an unresolved scientific method. Existing defaults, comments, and external examples do not establish agreed study methods.
+- Distinguish confirmed study definitions, current implementation, and proposed methods.
+- Keep shared parameters in configuration and subject-specific decisions in YAML.
+- Validate changes with focused checks appropriate to the affected scientific calculation or transformation.
+- State which checks actually ran and which require recordings or interactive review.
+- Update documentation when workflow responsibilities or data contracts change. Keep detailed parameter definitions close to their implementation.
+
+## Repository map and sources of truth
+
+```text
+scripts/
+  01_preprocessing.py       Subject-level EEG/EMG preprocessing
+  02_create_ROIs.py         ROI averages from processed epochs
+  03_export_epochs_mat.py   MATLAB export branch
+  04_tep_features.py        Feature database and condition/context plots
+  05_statistics.R          Reserved statistics entry point
+  06_plotting.R            Reserved plotting entry point
+
+src/tms_eeg/
+  paths.py                 Canonical repository, data, and decision paths
+  config/
+    settings.py            ProjectConfig: shared processing/analysis settings
+    environment.py         Plotting backend selection
+  io/                      Recording loading, output writing, YAML handling
+  preprocessing/           Annotation processing and signal cleaning
+  analysis/                Context mapping, ROIs, features, metric collection
+  visualization/           TEP and field-power plots
+
+decisions/                 Subject review records and methodological reference
+data/                      Local recordings and generated results
+logs_terminal/             Historical execution logs
+utils/                     Standalone utilities
+pyproject.toml             Package, dependencies, and tool settings
+uv.lock                    Locked dependency resolution
+```
+
+Use these sources when making changes:
+
+- [Project configuration](src/tms_eeg/config/settings.py) defines shared settings, symbol mappings, contexts, ROIs, and component windows.
+- [Path helpers](src/tms_eeg/paths.py) define canonical subject paths.
+- [Numbered scripts](scripts/) establish the operations actually executed and their order.
+- [Subject decisions](decisions/) preserve review choices for reproducibility and reporting.
+- [TESA reference notes](decisions/TESA_example.md) provide methodological background; they do not define the active preprocessing sequence.
+- Historical terminal logs describe earlier runs and are not specifications for current behavior.
+
+## Data conventions
+
+### Subjects and input files
+
+Subject IDs use forms such as `V00` or `V07`. Decision loading validates `V` followed by digits.
+
+Raw data is expected under:
+
+```text
+data/raw/<subject>_data/
+```
+
+The reader loads a BDF from that directory. A condition text file can provide the stimulus sequence when condition annotations are unavailable.
+
+The current raw and text readers select the first matching file. Keep inputs unambiguous. Multiple matching files do not provide explicit block handling.
+
+### Annotations, event codes, and symbols
+
+Annotation processing labels `Stimulus A` pulse events using nearby `8Bit` annotations, or a local text-file sequence when those annotations are absent.
+
+| Annotation label; case varies in recordings | Default event code | Study symbol |
+|---|---|---|
+| `8bit 1` | `1` | `0` |
+| `8bit 2` | `2` | `1` |
+| `8bit 3` | `3` | `2` |
+
+Annotation suffixes, numeric event codes, and study symbols are different representations. Use the mappings derived from `ProjectConfig.analysis_name_to_symbol`; do not interchange them.
+
+The text fallback expects one study symbol—`0`, `1`, or `2`—per nonempty line and converts it to the corresponding annotation label.
+
+Its current implementation repeats a sequence shorter than the pulse count. Check annotation alignment rather than assuming this fallback validates the experimental sequence.
+
+### Units and epoch identity
+
+- MNE signal arrays use volts.
+- Configuration time values use seconds.
+- Exported amplitude features use microvolts (`uV`).
+- Exported latencies use milliseconds (`ms`).
+- Exported AUC uses microvolt-seconds (`uV*s`).
+- `epochs.selection` identifies original event positions after rejection. Context mapping uses this to recover original stimulus history.
+
+### ROI signals
+
+Each ROI signal is the arithmetic mean of the available electrodes in its configured group.
+
+An ROI with no available electrodes is skipped. Check electrode availability when comparing subjects, because the contributing electrodes can differ.
+
+### Output layout
+
+Representative paths for `V00`:
+
+```text
+data/raw/V00_data/*.bdf
+data/raw/V00_data/*.txt
+decisions/sub-V00.yaml
+
+data/processed/V00/
+  processed_tep/V00_epochs_processed.fif
+  processed_context_tree/V00_epochs_processed.fif
+  emg_processed/V00_emg_epochs_processed.fif
+  processed_rois/V00_epochs_rois_processed.fif
+  processed_pre_and_post/
+  processed_only_post/
+  figures/
+
+data/group/database.csv
+```
+
+The data directory and large recording/output formats are Git-ignored. Subject decision YAML files are versioned.
+
+FIF writers overwrite their target files, and database export replaces its CSV. Figure saving is controlled separately by `io_save_figs`.
+
+## Workflow
+
+### 1. Subject preprocessing
+
+[01_preprocessing.py](scripts/01_preprocessing.py) orchestrates the current sequence:
+
+1. Load the BDF and assign channel types and montage.
+2. Interpolate the TMS artifact in continuous data using the script’s TESA-like mode.
+3. High-pass filter EEG.
+4. Process annotations and construct EEG and EMG epochs.
+5. Export original epoch indices and labels to YAML; inspect initial responses and epochs.
+6. Load subject decisions, mark bad channels, and reject bad EEG epochs in TEP mode.
+7. Apply average reference.
+8. Fit and apply ICA.
+9. Apply SOUND and SSP-SIR.
+10. Interpolate bad channels and resample.
+11. Apply EEG low-pass, EMG bandpass, and notch filters.
+12. Inspect responses, crop EEG epochs, and export mode-specific results.
+
+The script and called functions define execution. Some comments describe possible alternatives; inspect the implementation before changing scientific behavior.
+
+| Processing mode | YAML bad-epoch rejection | Preprocessing outputs |
+|---|---|---|
+| `tep` | Applied to EEG epochs | EEG and separate EMG epochs |
+| `context_tree` | Skipped | EEG epochs |
+
+Skipping YAML rejection does not guarantee that every pulse survives epoch construction. Recording boundaries or annotation rejection can still remove epochs.
+
+EMG currently does not receive EEG’s YAML trial rejection. Do not assume positional correspondence between saved EEG and EMG trial arrays.
+
+### 2. Subject decisions and manual review
+
+Subject YAML files preserve important decisions for future reporting. Shared configuration can change, so it must not be treated as a historical record of how an individual subject was processed.
+
+| YAML key | Current role |
+|---|---|
+| `bad_channels` | EEG names marked bad before reference/ICA and interpolated later |
+| `bad_epochs` | Zero-based positions passed to EEG epoch rejection in TEP mode |
+| `ica_exclude` | Zero-based ICA component indices to remove |
+| `epochs_record` | Generated original event indices and annotation labels before manual rejection |
+| `notes`, `reviewed` | Human-maintained review context |
+
+The generated `epochs_record.index` comes from `epochs.selection`. In contrast, `bad_epochs` is passed to `epochs.drop()` as positions in the current Epochs object. These may differ after earlier automatic rejection. Check the mapping before recording exclusions.
+
+The preprocessing script loads decisions once before ICA. Editing YAML during ICA inspection does not automatically reload it. Ensure the intended decisions are loaded before applying exclusions or saving final outputs.
+
+Epoch-record export writes or replaces that YAML block even when regular data export is disabled.
+
+The supplied `sub-V00.yaml` contains test decisions; `sub-V01.yaml` contains placeholders. Neither establishes valid decisions for another volunteer.
+
+### 3. ROI construction
+
+[02_create_ROIs.py](scripts/02_create_ROIs.py) loads the selected mode’s processed epochs and creates one averaged channel per configured ROI.
+
+Electrode-level data remains available for complementary analysis.
+
+Both processing modes currently share the `processed_rois` output location. Recording the source preprocessing mode and settings alongside derived outputs is a planned provenance improvement after preprocessing is settled. Until then, ensure saved ROIs match the electrode epochs being analyzed.
+
+### 4. MATLAB export branch
+
+[03_export_epochs_mat.py](scripts/03_export_epochs_mat.py) is intended to export full pre/post and post-only windows for downstream context-tree analysis.
+
+The MATLAB variable `data` contains:
+
+- `X_ter`: a `1 × N` row vector of study symbols.
+- `Y_ter`: a `2 × N_channels` cell array. Row 1 contains channel names; row 2 contains sample-by-epoch matrices in microvolts.
+
+The script currently passes a `window` argument that `EpochAnnotationExporter.export_to_mat()` does not accept. Resolve that interface before running this branch, then verify actual crop windows and symbol-to-epoch alignment.
+
+### 5. Features and visualization
+
+[04_tep_features.py](scripts/04_tep_features.py) loads electrode and ROI epochs for `analysis_subjects`, collects condition-level features across subjects, and generates condition/context plots.
+
+Context mapping reconstructs stimulus history from the raw recording.
+
+Current numerical definitions:
+
+- Electrode and ROI features come from **condition-averaged evoked responses**, not individual trials.
+- Features include P30 mean amplitude, signed peak amplitude, peak latency, AUC, and N15–P30 peak-to-peak amplitude.
+- Default peak selection chooses the largest absolute deflection while retaining its sign.
+- Default AUC is signed.
+- Field power is the standard deviation across channels at each time sample.
+- GMFP uses all EEG channels.
+- The current LMFP call computes dispersion across all saved ROI-average channels together. It does not compute separate field power within each anatomical ROI.
+- Context-specific numerical features are not added to the current database; contexts feed plots.
+
+The long-format database schema is:
+
+```text
+subject, analysis_level, analysis_type, condition, channel,
+component, metric, unit, value
+```
+
+`analysis_level` is `channel` or `roi`. The `channel` field holds an electrode or ROI name and is empty for aggregate field-power metrics. The active script records `analysis_type="condition"`.
+
+A future trial-level database needs an explicit schema for block/trial identity and inclusion decisions. These are absent from the current export.
+
+## Scientific choices requiring agreement
+
+The study definitions above are fixed. These methods remain open and must not be silently resolved during implementation:
+
+- ICA selection: rank-based fitting versus a variance-based approach such as 95% explained variance.
+- Baseline correction and detrending strategy, including any prestimulus-only approach.
+- Final EEG resampling settings; 5000 Hz is not a study requirement.
+- The scientifically appropriate LMFP definition.
+- Post hoc participant exclusion criteria and their statistical definitions.
+
+Inspect both configuration and call sites for current behavior:
+
+- ICA currently calculates rank assuming 32 EEG channels and fits full epochs.
+- Epoch construction currently requests baseline correction and detrending.
+- EEG resampling currently uses `raw_downsample_freq` rather than `epoch_eeg_downsample_freq`.
+
+These describe execution, not final methodological decisions.
+
+## Setup and practical operation
+
+Use Python 3.11 or newer; `.python-version` currently selects 3.11.
+
+Dependencies are declared in [pyproject.toml](pyproject.toml) and resolved in [uv.lock](uv.lock).
+
+From the repository root:
 
 ```bash
-# Clone the repository
-git clone https://github.com/moraesvictorhugo/TMS-EEG_ContextTree_Processing_and_Analysis.git
-cd TMS-EEG_ContextTree_Processing_and_Analysis
-
-# Install with uv
 uv sync
 ```
 
-### VS Code
+MATLAB Engine (`24.2.*`) and PyTEP SOUND/SSP-SIR are declared dependencies. Preprocessing directly imports and calls SOUND and SSP-SIR. Check the local MATLAB installation and installed libraries’ requirements when preparing the environment.
 
-Select the project interpreter once per machine: run **Python: Select Interpreter** and choose the `.venv` folder in the workspace. The `.venv` environment is auto-detected on both Linux and Windows.
+Plotting selects Qt locally and a notebook backend for detected remote sessions. Interactive epoch and ICA review requires a suitable graphical environment. The remote branch references `ipympl`, which is not explicitly declared in project dependencies.
 
-### Using pip
+Before execution:
+
+1. Place each subject’s BDF and any required condition text file in the expected raw directory.
+2. Select the subject and mode in the script/configuration.
+3. Prepare valid subject YAML decisions.
+4. Inspect intermediate epochs and ICA results; record and load decisions before final processing.
+5. Generate matching electrode and ROI outputs for every subject selected for feature extraction.
+
+The first three scripts currently select `V00` in their source. Feature extraction uses `analysis_subjects` from configuration. There is no command-line subject/mode interface.
+
+Some scripts execute on import, so inspect their source rather than importing them to explore the workflow.
+
+Run the relevant stages after configuring them:
 
 ```bash
-# Clone the repository
-git clone https://github.com/moraesvictorhugo/TMS-EEG_ContextTree_Processing_and_Analysis.git
-cd TMS-EEG_ContextTree_Processing_and_Analysis
-
-# Install dependencies
-pip install -r requirements.txt
+uv run python scripts/01_preprocessing.py
+uv run python scripts/02_create_ROIs.py
+uv run python scripts/04_tep_features.py
 ```
 
-### Optional Dependencies
+MATLAB export is a separate branch requiring the interface correction described above. Statistics and final R plotting scripts are reserved entry points.
 
-For enhanced functionality, you can install optional dependencies:
+Subject paths resolve from the repository root through `paths.py`. The configured database CSV path is relative to the working directory; run commands from the repository root.
 
-```bash
-# MATLAB Engine support (requires MATLAB installation)
-pip install matlabengine
-```
+## Validation expectations
 
-## 📁 Project Structure
+No automated test suite or CI configuration is currently included.
 
-```
-MEPs-and-TEPs-with-Context-Tree/
-├── data/                           # Data storage
-│   ├── raw/                        # Original, unmodified EEG files
-│   └── processed/                  # Output from preprocessing/processing steps
-│
-├── src/                            # Main source code
-│   └── tms_eeg/                    # TMS-EEG package
-│       ├── __init__.py
-│       ├── config/                 # Configuration files
-│       │   ├── __init__.py
-│       │   ├── environment.py      # Environment setup
-│       │   └── settings.py         # Configuration dataclasses
-│       ├── io/                     # File loading and saving
-│       │   ├── __init__.py
-│       │   ├── reader.py           # Data loading utilities
-│       │   └── writer.py           # Data saving utilities
-│       ├── preprocessing/          # Signal processing pipeline
-│       │   ├── __init__.py
-│       │   ├── annotation_processor.py  # Event annotation processing
-│       │   ├── artifacts.py        # TMS artifact removal
-│       │   ├── downsampling.py     # Signal downsampling
-│       │   ├── epoching.py         # Epoch creation
-│       │   ├── filtering.py        # Signal filtering
-│       │   └── ica.py              # Independent Component Analysis
-│       ├── analysis/               # Analysis modules
-│       │   ├── __init__.py
-│       │   ├── context.py          # Context tree analysis
-│       │   ├── features.py         # Feature extraction
-│       │   └── group.py            # Group-level analysis
-│       └── visualization/          # Plotting and visualization
-│           ├── __init__.py
-│           ├── emg_plots.py        # EMG signal plots
-│           ├── gfp_plots.py        # Global Field Power plots
-│           ├── group_plots.py      # Group analysis plots
-│           └── tep_plots.py        # TMS-evoked potential plots
-│
-├── notebooks/                      # Jupyter notebooks for exploration
-│   └── 01_data_exploration.ipynb
-│
-├── results/                        # Analysis results
-│   └── group/                      # Group-level results
-│
-├── trigger/                        # External dependencies (PyTEP-SOUND-SSP-SIR)
-│
-├── main_preprocessing.py           # Preprocessing pipeline entry point
-├── main_analysis.py               # Analysis pipeline entry point
-├── main_group.py                  # Group analysis entry point
-├── pyproject.toml                 # Project configuration
-├── uv.lock                        # Dependency lock file
-├── estrutura.txt                  # Project structure documentation
-└── README.md                      # This file
-```
+Use focused numerical checks and representative recordings to validate changes. Depending on the change, check:
 
-### Key Modules Overview
+- Event counts and condition mappings.
+- Original epoch identities and context assignments.
+- Electrode availability and ROI composition.
+- Signal units and time windows.
+- Feature calculations.
+- Alignment between symbols, EEG/EMG trials, and exported arrays.
+- Output schemas and source preprocessing mode.
 
-- **`src/tms_eeg/config/`**: Configuration management using dataclasses for flexible parameter control
-- **`src/tms_eeg/io/`**: Data input/output operations with support for various EEG file formats
-- **`src/tms_eeg/preprocessing/`**: Complete preprocessing pipeline including artifact removal, filtering, and ICA
-- **`src/tms_eeg/analysis/`**: Core analysis modules for TEP extraction, context tree analysis, and group statistics
-- **`src/tms_eeg/visualization/`**: Comprehensive plotting functions for TEPs, GFP, and context comparisons
-  - **`tep_plots.py`**: TMS-evoked potential visualization with topographic maps and time courses
-  - **`gfp_plots.py`**: Global and Local Mean Field Power analysis and plotting
-  - **`emg_plots.py`**: EMG signal visualization for muscle activity monitoring
-  - **`group_plots.py`**: Group-level statistical comparisons and visualizations
+Report interactive and data-dependent checks separately from checks run automatically.
 
-## ⚡ Quick Start
+## Study contact
 
-### 1. Basic Preprocessing
+Victor Hugo Moraes — PD-NEUROMAT, University of São Paulo
 
-```python
-# Run preprocessing pipeline
-python main_preprocessing.py
-```
-
-This will:
-- Load raw EEG data
-- Remove TMS artifacts
-- Apply filtering and epoching
-- Perform ICA decomposition
-- Save processed data
-
-### 2. Analysis Pipeline
-
-```python
-# Run analysis pipeline
-python main_analysis.py
-```
-
-This will:
-- Load preprocessed epochs
-- Extract TEP features (peak-to-peak amplitudes)
-- Compute GMFP/LMFP measures
-- Perform context tree analysis
-- Generate visualizations
-
-### 3. Group Analysis
-
-```python
-# Run group-level analysis
-python main_group.py
-```
-
-This will aggregate results across all subjects and generate group-level statistics.
-
-## ⚙️ Configuration
-
-The project uses a flexible configuration system based on Python dataclasses. Configuration is managed through `src/tms_eeg/config/settings.py`.
-
-### Basic Configuration
-
-```python
-from tms_eeg.config.settings import ProjectConfig
-
-# Create configuration for a specific subject
-config = ProjectConfig(subject_id="V07")
-
-# Access configuration sections
-print(config.analysis_subjects)  # List of subjects
-print(config.analysis_channels_of_interest)  # EEG channels to analyze
-print(config.analysis_time_windows)  # Time windows for analysis
-```
-
-### Customizing Analysis Parameters
-
-```python
-# Modify configuration
-config.analysis_subjects = ["V01", "V02", "V03"]  # Change subject list
-config.analysis_channels_of_interest = ["C3", "Cz", "C4"]  # Change channels
-config.analysis_time_windows = {
-    "N15": (0.012, 0.020),
-    "P30": (0.020, 0.040),
-    # Add custom time windows
-}
-```
-
-### Context Tree Configuration
-
-The context tree analysis can be customized by modifying the context definitions:
-
-```python
-config.analysis_context_definitions = {
-    "ctx_0": [0],           # Current stimulus = 0, any past
-    "ctx_2": [2],           # Current stimulus = 2, any past  
-    "ctx_01": [0, 1],       # Previous = 0, current = 1
-    "ctx_11": [1, 1],       # Previous = 1, current = 1
-    "ctx_21": [2, 1],       # Previous = 2, current = 1
-}
-```
-
-## 📊 Usage
-
-### Preprocessing
-
-The preprocessing pipeline (`main_preprocessing.py`) handles:
-
-1. **Data Loading**: Load raw EEG data with proper channel configuration
-2. **Artifact Removal**: Remove TMS-induced artifacts using baseline correction
-3. **Filtering**: Apply bandpass and notch filters
-4. **Epoching**: Create epochs around TMS pulses
-5. **ICA Decomposition**: Remove remaining artifacts using Independent Component Analysis
-6. **Downsampling**: Reduce sampling rate for analysis
-7. **Visualization**: Generate quality control plots
-
-```python
-# Example: Custom preprocessing
-from tms_eeg.config.settings import ProjectConfig
-from tms_eeg.preprocessing.epoching import EEGEpocher
-from tms_eeg.preprocessing.artifacts import ArtifactRemover
-
-config = ProjectConfig(subject_id="V07")
-# ... preprocessing steps as defined in main_preprocessing.py
-```
-
-### Analysis
-
-The analysis pipeline (`main_analysis.py`) performs:
-
-1. **TEP Extraction**: Extract time-evoked potentials for different conditions
-2. **Feature Calculation**: Compute peak-to-peak amplitudes and MFP measures
-3. **Context Analysis**: Analyze responses based on stimulus context
-4. **Visualization**: Generate comprehensive plots
-
-```python
-# Example: Custom analysis
-from tms_eeg.config.settings import ProjectConfig
-from tms_eeg.analysis.features import FeatureExtractor
-from tms_eeg.analysis.context import ContextMapper
-
-config = ProjectConfig(subject_id="V07")
-# ... analysis steps as defined in main_analysis.py
-```
-
-### Group Analysis
-
-The group analysis (`main_group.py`) aggregates results across subjects:
-
-1. **Data Aggregation**: Combine results from all subjects
-2. **Statistical Analysis**: Compute group-level statistics
-3. **Visualization**: Generate group comparison plots
-
-## 📈 Visualization Capabilities
-
-The project provides comprehensive visualization tools for TMS-EEG analysis:
-
-### TMS-Evoked Potentials (TEPs)
-- **Time Course Plots**: Visualize TEP waveforms across different conditions
-- **Topographic Maps**: Spatial distribution of brain responses over time
-- **ROI Analysis**: Region-of-interest specific responses
-- **Joint Plots**: Combined time course and topographic visualization
-
-### Global Field Power (GFP) Analysis
-- **GMFP/LMFP Plots**: Global and Local Mean Field Power time courses
-- **Peak Detection**: Automatic identification of significant peaks
-- **Context Comparisons**: Side-by-side comparison of different stimulus contexts
-- **Overlay Plots**: Multiple conditions on the same plot for easy comparison
-
-### Context Tree Analysis Visualization
-- **Context Comparison Plots**: Compare responses across different stimulus contexts
-- **Temporal Evolution**: Time-based analysis of context effects
-- **Branch Analysis**: Specific comparisons between context branches
-- **Statistical Overlays**: Confidence intervals and significance markers
-
-### EMG Analysis
-- **Muscle Activity Monitoring**: EMG signal visualization for quality control
-- **Artifact Detection**: Identification of muscle artifacts in EEG data
-- **Time-Frequency Analysis**: EMG power across different frequency bands
-
-### Group-Level Visualizations
-- **Statistical Comparisons**: Group means with error bars and significance testing
-- **Effect Size Plots**: Visualization of effect sizes across conditions
-- **Correlation Analysis**: Relationships between different measures
-- **Heatmaps**: Matrix visualization of group-level statistics
-
-## 🔄 Data Processing Pipeline
-
-### Preprocessing Workflow
-
-```
-Raw EEG Data
-    ↓
-Channel Configuration & Montage
-    ↓
-TMS Artifact Removal
-    ↓
-Filtering (Bandpass + Notch)
-    ↓
-Epoch Creation (-0.8s to +0.8s)
-    ↓
-ICA Decomposition
-    ↓
-Downsampling (725 Hz)
-    ↓
-Processed Epochs
-```
-
-### Analysis Workflow
-
-```
-Processed Epochs
-    ↓
-Condition-based Analysis
-    ├── TEP Extraction
-    ├── Peak-to-Peak Calculation
-    ├── GMFP/LMFP Computation
-    └── Visualization
-    ↓
-Context Tree Analysis
-    ├── Context Mapping
-    ├── Context-based TEPs
-    ├── Feature Extraction
-    └── Context Comparisons
-    ↓
-Group Aggregation
-    ├── Feature Collection
-    ├── Statistical Analysis
-    └── Group Visualizations
-```
-
-## 📚 Dependencies
-
-### Core Dependencies
-
-- **MNE-Python** (≥1.11.0): EEG data processing and analysis
-- **NumPy** (≥2.4.2): Numerical computing
-- **Pandas** (≥3.0.1): Data manipulation and analysis
-- **Matplotlib** (≥3.10.8): Plotting and visualization
-- **SciPy** (≥1.17.1): Scientific computing
-- **scikit-learn** (≥1.8.0): Machine learning utilities
-
-### Optional Dependencies
-
-- **MATLAB Engine** (≥9.10.0): For SOUND artifact removal algorithm
-- **PyQt5** (≥5.15.11): GUI components
-- **Seaborn** (≥0.13.2): Enhanced statistical visualization
-
-### Development Dependencies
-
-- **Jupyter** (≥1.1.1): Interactive notebooks
-- **ipykernel** (≥7.2.0): Jupyter kernel
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-#### 1. MATLAB Engine Not Found
-
-**Problem**: `ModuleNotFoundError: No module named 'matlab'`
-
-**Solution**: 
-- Install MATLAB Engine API for Python
-- Or disable MATLAB-dependent features in configuration
-
-#### 2. Memory Issues with Large Datasets
-
-**Problem**: Out of memory errors during processing
-
-**Solution**:
-- Process subjects individually
-- Reduce epoch length or sampling rate
-- Use more efficient data types
-
-#### 3. ICA Convergence Issues
-
-**Problem**: ICA decomposition fails to converge
-
-**Solution**:
-- Check data quality and preprocessing
-- Adjust ICA parameters in configuration
-- Manually inspect and remove bad components
-
-#### 4. Missing Dependencies
-
-**Problem**: Import errors for required packages
-
-**Solution**:
-```bash
-# Reinstall dependencies
-pip install -r requirements.txt
-# or
-uv sync
-```
-
-### Getting Help
-
-If you encounter issues not covered here:
-
-1. Check the project's GitHub Issues page
-2. Review the code comments and docstrings
-3. Contact the maintainers via email
-4. Create a detailed issue report with:
-   - Python version
-   - Operating system
-   - Error message
-   - Steps to reproduce
-
-### Known Limitations
-
-- Currently optimized for specific EEG montages and channel configurations
-- MATLAB integration requires local MATLAB installation
-- Large datasets may require significant memory and processing time
-- Some analysis features are still under development
-
-## 📊 Project Outputs
-
-The project generates comprehensive outputs for TMS-EEG analysis:
-
-### Data Files
-- **Processed Epochs**: Cleaned and filtered EEG epochs ready for analysis
-- **Evoked Responses**: Average TEPs for different conditions and contexts
-- **Feature Data**: Peak-to-peak amplitudes, GMFP/LMFP measures, and other extracted features
-- **Group Statistics**: Aggregated results across subjects with statistical analysis
-
-### Visualization Outputs
-- **TEP Plots**: Time-evoked potential waveforms with topographic maps
-- **GFP Analysis**: Global and Local Mean Field Power plots
-- **Context Comparisons**: Visualizations of context-dependent responses
-- **Group Plots**: Statistical comparisons and effect size visualizations
-- **Quality Control**: Preprocessing validation plots and artifact detection
-
-### Analysis Reports
-- **Individual Subject Reports**: Comprehensive analysis for each subject
-- **Group Analysis Reports**: Statistical summaries across the cohort
-- **Context Analysis Reports**: Detailed context tree analysis results
-- **Feature Extraction Reports**: Summary of all extracted neurophysiological measures
-
-## 🎯 Research Applications
-
-This project is designed for researchers studying:
-
-- **Neural Adaptation**: How brain responses change with repeated stimulation
-- **Context Processing**: How preceding stimuli influence current responses
-- **Information Processing**: Brain's ability to predict and process structured sequences
-- **Neurological Disorders**: Applications in Parkinson's disease and other neurological conditions
-- **Brain Connectivity**: Understanding functional connectivity through TMS-EEG responses
-
-## 🔄 Workflow Integration
-
-The project supports integration into larger research workflows:
-
-1. **Data Import**: Compatible with standard EEG file formats
-2. **Batch Processing**: Automated processing of multiple subjects
-3. **Custom Analysis**: Flexible configuration for different experimental designs
-4. **Export Options**: Multiple output formats for downstream analysis
-5. **Reproducibility**: Configuration-based analysis for consistent results
-
-## 📞 Contact
-
-For questions, suggestions, or collaboration opportunities:
-
-- **Project Maintainer**: Victor Hugo Moraes
-- **Research Group**: PD-NEUROMAT
-- **Email**: moraes.vh@usp.br
-- **Institution**: University of São Paulo
-
----
-
-**Note**: This software is intended for research purposes. Users are responsible for ensuring compliance with their institution's data handling and analysis policies.
+Email: moraes.vh@usp.br
